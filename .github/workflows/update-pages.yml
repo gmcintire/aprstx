@@ -1,0 +1,146 @@
+name: Update GitHub Pages
+
+on:
+  workflow_dispatch:
+  workflow_run:
+    workflows: ["Dev Release", "APT Repository"]
+    types:
+      - completed
+  schedule:
+    # Run daily to ensure Pages stays up to date
+    - cron: '0 0 * * *'
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: "pages"
+  cancel-in-progress: true
+
+jobs:
+  update-pages:
+    name: Update GitHub Pages
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      - name: Download current GitHub Pages
+        continue-on-error: true
+        run: |
+          # Try to download current pages content
+          mkdir -p current-pages
+          cd current-pages
+          wget -r -np -nH --cut-dirs=1 -R "index.html*" https://gmcintire.github.io/aprstx/ || true
+          cd ..
+      
+      - name: Download stable repository artifact
+        uses: dawidd6/action-download-artifact@v3
+        continue-on-error: true
+        with:
+          workflow: apt-repository.yml
+          name: apt-repository
+          path: stable-artifacts
+      
+      - name: Download dev repository artifact
+        uses: dawidd6/action-download-artifact@v3
+        continue-on-error: true
+        with:
+          workflow: dev-release.yml
+          name: dev-repository
+          path: dev-artifacts
+      
+      - name: Merge repositories
+        run: |
+          # Create the final pages structure
+          mkdir -p pages-deploy/aprstx
+          
+          # Copy existing pages content if available
+          if [ -d current-pages/aprstx ]; then
+            cp -r current-pages/aprstx/* pages-deploy/aprstx/ || true
+          fi
+          
+          # Extract and merge stable repository if available
+          if [ -f stable-artifacts/apt-repository.tar.gz ]; then
+            echo "Extracting stable repository..."
+            mkdir -p temp-stable
+            tar xzf stable-artifacts/apt-repository.tar.gz -C temp-stable
+            cp -r temp-stable/* pages-deploy/aprstx/
+            rm -rf temp-stable
+          fi
+          
+          # Extract and merge dev repository if available
+          if [ -f dev-artifacts/dev-repository.tar.gz ]; then
+            echo "Extracting dev repository..."
+            mkdir -p temp-dev
+            tar xzf dev-artifacts/dev-repository.tar.gz -C temp-dev
+            mkdir -p pages-deploy/aprstx/dev
+            cp -r temp-dev/* pages-deploy/aprstx/dev/
+            rm -rf temp-dev
+          fi
+          
+          # Create root index if it doesn't exist
+          if [ ! -f pages-deploy/index.html ]; then
+            cat > pages-deploy/index.html << 'EOF'
+          <!DOCTYPE html>
+          <html>
+          <head>
+              <title>gmcintire.github.io</title>
+              <meta charset="utf-8">
+              <style>
+                  body {
+                      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+                      line-height: 1.6;
+                      color: #333;
+                      max-width: 800px;
+                      margin: 0 auto;
+                      padding: 20px;
+                  }
+                  .project {
+                      background: #f6f8fa;
+                      border: 1px solid #d1d5da;
+                      border-radius: 6px;
+                      padding: 16px;
+                      margin-bottom: 16px;
+                  }
+                  h2 {
+                      margin-top: 0;
+                  }
+              </style>
+          </head>
+          <body>
+              <h1>Graham McIntire's Projects</h1>
+              
+              <div class="project">
+                  <h2>APRS Daemon (aprstx)</h2>
+                  <p>A high-performance APRS daemon written in Rust, providing I-gate and digipeater functionality.</p>
+                  <ul>
+                      <li><a href="/aprstx/">Stable APT Repository</a> - Production releases</li>
+                      <li><a href="/aprstx/dev/">Development APT Repository</a> - Latest builds from main branch</li>
+                      <li><a href="https://github.com/gmcintire/aprstx">GitHub Repository</a></li>
+                  </ul>
+              </div>
+          </body>
+          </html>
+          EOF
+          fi
+          
+          # Create aprstx index if missing
+          if [ ! -f pages-deploy/aprstx/index.html ]; then
+            echo "Warning: No stable repository index.html found"
+          fi
+      
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: pages-deploy
+      
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

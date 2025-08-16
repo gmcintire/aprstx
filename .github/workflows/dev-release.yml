@@ -135,9 +135,9 @@ jobs:
           name: aprstx-dev-${{ matrix.debian_version.codename }}-${{ matrix.arch.deb }}
           path: ${{ env.DEB_PACKAGE }}
   
-  # Deploy dev packages to a separate APT repository path
-  deploy-dev-apt:
-    name: Deploy Dev APT Repository
+  # Create and upload dev repository as artifact
+  create-dev-repository:
+    name: Create Dev APT Repository
     needs: build-dev-packages
     runs-on: ubuntu-latest
     
@@ -287,48 +287,13 @@ sudo apt install aprstx
           </html>
           EOF
       
-      - name: Prepare for GitHub Pages deployment
+      - name: Create archive of dev repository
         run: |
-          # Get existing pages content if any
-          mkdir -p pages-deploy
-          
-          # Add dev repository under /aprstx/dev/
-          mkdir -p pages-deploy/aprstx/dev
-          cp -r apt-dev/* pages-deploy/aprstx/dev/
-          
-          # Create a simple index if it doesn't exist
-          if [ ! -f pages-deploy/index.html ]; then
-            cat > pages-deploy/index.html << 'EOF'
-          <!DOCTYPE html>
-          <html>
-          <head>
-              <title>gmcintire.github.io</title>
-          </head>
-          <body>
-              <h1>Projects</h1>
-              <ul>
-                  <li><a href="/aprstx/">APRS Daemon (aprstx) - Stable APT Repository</a></li>
-                  <li><a href="/aprstx/dev/">APRS Daemon (aprstx) - Development APT Repository</a></li>
-              </ul>
-          </body>
-          </html>
-          EOF
-          fi
+          tar czf dev-repository.tar.gz -C apt-dev .
       
-      - name: Upload Pages artifact
-        uses: actions/upload-pages-artifact@v3
+      - name: Upload dev repository artifact
+        uses: actions/upload-artifact@v4
         with:
-          path: pages-deploy
-  
-  deploy-pages:
-    name: Deploy to GitHub Pages
-    needs: deploy-dev-apt
-    runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    
-    steps:
-      - name: Deploy to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v4
+          name: dev-repository
+          path: dev-repository.tar.gz
+          retention-days: 7

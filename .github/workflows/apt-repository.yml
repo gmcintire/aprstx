@@ -319,43 +319,13 @@ jobs:
           
           chmod +x apt/install.sh
       
-      - name: Prepare for GitHub Pages deployment
+      - name: Create repository archive
         run: |
-          # Create a directory structure for subdirectory deployment
-          mkdir -p pages-deploy/aprstx
-          cp -r apt/* pages-deploy/aprstx/
-          
-          # Create a simple redirect index at root if needed
-          cat > pages-deploy/index.html << 'EOF'
-          <!DOCTYPE html>
-          <html>
-          <head>
-              <title>gmcintire.github.io</title>
-              <meta charset="utf-8">
-          </head>
-          <body>
-              <h1>Projects</h1>
-              <ul>
-                  <li><a href="/aprstx/">APRS Daemon (aprstx) - APT Repository</a></li>
-              </ul>
-          </body>
-          </html>
-          EOF
+          tar czf apt-repository.tar.gz -C apt .
       
-      - name: Upload Pages artifact
-        uses: actions/upload-pages-artifact@v3
+      - name: Upload repository artifact
+        uses: actions/upload-artifact@v4
         with:
-          path: pages-deploy
-  
-  deploy-pages:
-    name: Deploy to GitHub Pages
-    needs: build-repository
-    runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    
-    steps:
-      - name: Deploy to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v4
+          name: apt-repository
+          path: apt-repository.tar.gz
+          retention-days: 30
