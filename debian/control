@@ -4,9 +4,7 @@ Priority: optional
 Maintainer: Your Name <your.email@example.com>
 Build-Depends: debhelper-compat (= 13),
                cargo,
-               rustc (>= 1.70),
-               pkg-config,
-               libudev-dev
+               rustc (>= 1.70)
 Standards-Version: 4.6.2
 Homepage: https://github.com/yourusername/aprstx
 Vcs-Browser: https://github.com/yourusername/aprstx

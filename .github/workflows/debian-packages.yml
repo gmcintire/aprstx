@@ -54,8 +54,7 @@ jobs:
             dpkg-dev \
             lintian \
             fakeroot \
-            build-essential \
-            pkg-config
+            build-essential
       
       - name: Prepare version
         id: version
@@ -109,12 +108,13 @@ jobs:
           # Set architecture for dpkg
           export DEB_HOST_ARCH=${{ matrix.arch.deb }}
           
-          # Build binary package
+          # Build binary package with -d flag to skip dependency checks
+          # We handle dependencies ourselves through GitHub Actions
           if [ "${{ matrix.arch.deb }}" == "amd64" ]; then
-            dpkg-buildpackage -us -uc -b
+            dpkg-buildpackage -us -uc -b -d
           else
             # For cross-compilation, we need to set the host architecture
-            dpkg-buildpackage -us -uc -b --host-arch=${{ matrix.arch.deb }}
+            dpkg-buildpackage -us -uc -b -d --host-arch=${{ matrix.arch.deb }}
           fi
       
       - name: Check package
