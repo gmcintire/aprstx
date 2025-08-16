@@ -41,7 +41,7 @@ jobs:
           cd ..
       
       - name: Download stable repository artifact
-        uses: dawidd6/action-download-artifact@v3
+        uses: dawidd6/action-download-artifact@v6
         continue-on-error: true
         with:
           workflow: apt-repository.yml
@@ -49,7 +49,7 @@ jobs:
           path: stable-artifacts
       
       - name: Download dev repository artifact
-        uses: dawidd6/action-download-artifact@v3
+        uses: dawidd6/action-download-artifact@v6
         continue-on-error: true
         with:
           workflow: dev-release.yml
