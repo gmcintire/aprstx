@@ -279,14 +279,112 @@ jobs:
               <h2>Repository Contents</h2>
               <ul>
                   <li><a href="dev-repository-key.asc">GPG Public Key</a></li>
-                  <li><a href="dists/">Package Distributions</a></li>
-                  <li><a href="pool/">Package Pool</a></li>
+                  <li><a href="dists/">Package Distributions</a> (browse all available packages)</li>
+                  <li><a href="pool/">Package Pool</a> (browse .deb files)</li>
+              </ul>
+              
+              <h2>Browse Repository</h2>
+              <p>You can browse the repository structure to download individual .deb packages:</p>
+              <ul>
+                  <li><a href="pool/main/">Browse all .deb packages</a></li>
               </ul>
               
               <p><a href="/aprstx/">← Back to stable repository</a></p>
           </body>
           </html>
           ENDHTML
+      
+      - name: Create directory listings
+        run: |
+          # Function to create index.html for a directory
+          create_index() {
+            local dir="$1"
+            local title="$(basename "$dir")"
+            
+            cat > "$dir/index.html" << 'EOF'
+          <!DOCTYPE html>
+          <html>
+          <head>
+              <title>Index of /aprstx/dev/'"$title"'</title>
+              <style>
+                  body {
+                      font-family: monospace;
+                      margin: 20px;
+                  }
+                  h1 {
+                      font-size: 1.5em;
+                  }
+                  table {
+                      border-collapse: collapse;
+                      width: 100%;
+                  }
+                  th, td {
+                      text-align: left;
+                      padding: 8px;
+                      border-bottom: 1px solid #ddd;
+                  }
+                  th {
+                      background-color: #f2f2f2;
+                  }
+                  a {
+                      text-decoration: none;
+                      color: #0066cc;
+                  }
+                  a:hover {
+                      text-decoration: underline;
+                  }
+                  .size {
+                      text-align: right;
+                  }
+                  .date {
+                      text-align: right;
+                  }
+              </style>
+          </head>
+          <body>
+              <h1>Index of /aprstx/dev/'"$title"'</h1>
+              <table>
+                  <tr>
+                      <th>Name</th>
+                      <th>Last Modified</th>
+                      <th>Size</th>
+                  </tr>
+                  <tr>
+                      <td colspan="3"><a href="../">Parent Directory</a></td>
+                  </tr>
+          EOF
+            
+            # Add entries for files and directories
+            for item in "$dir"/*; do
+              if [ -e "$item" ] && [ "$(basename "$item")" != "index.html" ]; then
+                name=$(basename "$item")
+                date=$(date -r "$item" "+%Y-%m-%d %H:%M")
+                
+                if [ -d "$item" ]; then
+                  echo "                  <tr><td><a href=\"$name/\">$name/</a></td><td class=\"date\">$date</td><td class=\"size\">-</td></tr>" >> "$dir/index.html"
+                else
+                  size=$(ls -lh "$item" | awk '{print $5}')
+                  echo "                  <tr><td><a href=\"$name\">$name</a></td><td class=\"date\">$date</td><td class=\"size\">$size</td></tr>" >> "$dir/index.html"
+                fi
+              fi
+            done
+            
+            echo "              </table>" >> "$dir/index.html"
+            echo "          </body>" >> "$dir/index.html"
+            echo "          </html>" >> "$dir/index.html"
+          }
+          
+          # Create index files for key directories
+          for dir in apt-dev/dists apt-dev/pool; do
+            if [ -d "$dir" ]; then
+              create_index "$dir"
+              
+              # Create index for subdirectories
+              find "$dir" -type d | while read subdir; do
+                create_index "$subdir"
+              done
+            fi
+          done
       
       - name: Create archive of dev repository
         run: |
