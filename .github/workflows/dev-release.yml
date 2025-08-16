@@ -209,7 +209,8 @@ jobs:
       
       - name: Create dev index.html
         run: |
-          cat > apt-dev/index.html << 'EOF'
+          # Create the HTML file with proper escaping
+          cat > apt-dev/index.html << 'ENDHTML'
           <!DOCTYPE html>
           <html>
           <head>
@@ -257,15 +258,15 @@ jobs:
               <h2>Add Development Repository</h2>
               
               <pre>
-# Add repository key
-curl -fsSL https://gmcintire.github.io/aprstx/dev/dev-repository-key.asc | sudo apt-key add -
-
-# Add dev repository
-echo "deb https://gmcintire.github.io/aprstx/dev dev main" | sudo tee /etc/apt/sources.list.d/aprstx-dev.list
-
-# Update and install dev version
-sudo apt update
-sudo apt install aprstx
+          # Add repository key
+          curl -fsSL https://gmcintire.github.io/aprstx/dev/dev-repository-key.asc | sudo apt-key add -
+          
+          # Add dev repository
+          echo "deb https://gmcintire.github.io/aprstx/dev dev main" | sudo tee /etc/apt/sources.list.d/aprstx-dev.list
+          
+          # Update and install dev version
+          sudo apt update
+          sudo apt install aprstx
               </pre>
               
               <h2>Latest Build Info</h2>
@@ -285,7 +286,7 @@ sudo apt install aprstx
               <p><a href="/aprstx/">← Back to stable repository</a></p>
           </body>
           </html>
-          EOF
+          ENDHTML
       
       - name: Create archive of dev repository
         run: |
