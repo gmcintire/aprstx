@@ -1,0 +1,102 @@
+# Example aprstx configuration file
+
+# Your callsign with SSID
+mycall = "N0CALL-10"
+
+# Serial port configuration
+[[serial_ports]]
+name = "vhf"
+device = "/dev/ttyUSB0"
+baud_rate = 9600
+protocol = "kiss"
+tx_enable = true
+rx_enable = true
+
+# Uncomment to add a second port
+# [[serial_ports]]
+# name = "uhf"
+# device = "/dev/ttyUSB1" 
+# baud_rate = 9600
+# protocol = "tnc2"
+# tx_enable = false
+# rx_enable = true
+
+# APRS-IS Internet connection
+[aprs_is]
+server = "rotate.aprs2.net"
+port = 14580
+callsign = "N0CALL-10"
+passcode = "-1"  # Use -1 for receive-only, or your assigned passcode
+filter = "r/40.7/-74.0/50"  # Example: 50km radius filter
+tx_enable = false
+rx_enable = true
+
+# Digipeater settings
+[digipeater]
+enabled = true
+mycall = "N0CALL-10"
+aliases = ["WIDE1-1", "WIDE2-2"]
+viscous_delay = 5  # seconds
+max_hops = 3
+
+# Telemetry settings
+[telemetry]
+enabled = true
+interval = 1200  # seconds (20 minutes)
+comment = "aprstx daemon telemetry"
+
+# Packet filters
+[[filters]]
+name = "rfonly"
+action = "drop"
+pattern = "RFONLY"
+
+[[filters]]
+name = "nogate"
+action = "drop"
+pattern = "NOGATE"
+
+[[filters]]
+name = "tcpip"
+action = "drop"
+pattern = "TCPIP"
+
+# GPS configuration (optional)
+[gps]
+# GPS source type: "none", "serial", "gpsd", or "fixed"
+type = "none"
+
+# For serial GPS (NMEA)
+# device = "/dev/ttyUSB1"
+# baud_rate = 4800
+
+# For gpsd
+# host = "localhost"
+# port = 2947
+
+# For fixed position (lat,lon[,altitude_meters])
+# position = "40.7128,-74.0060,10"
+
+# Position beacon configuration (optional)
+[beacon]
+enabled = false
+callsign = "N0CALL-9"  # Can be different from main callsign for mobile
+interval = 600  # Maximum beacon interval in seconds
+path = "WIDE1-1,WIDE2-2"  # Digipeater path
+symbol_table = "/"  # Primary symbol table
+symbol = ">"  # Car symbol
+comment = "aprstx mobile"
+timestamp = true
+
+# Smart beaconing parameters
+[beacon.smart_beacon]
+enabled = true
+check_interval = 5        # How often to check position (seconds)
+min_interval = 30         # Minimum time between beacons
+stationary_interval = 600 # Interval when not moving (10 min)
+low_speed = 5            # Low speed threshold in knots
+low_speed_interval = 300 # Beacon interval at low speed (5 min)
+high_speed = 60          # High speed threshold in knots  
+high_speed_interval = 60 # Beacon interval at high speed (1 min)
+turn_angle = 20          # Turn angle in degrees to trigger beacon
+turn_speed = 5           # Minimum speed for turn detection

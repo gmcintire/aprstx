@@ -1,0 +1,53 @@
+[package]
+name = "aprstx"
+version = "0.1.0"
+edition = "2021"
+authors = ["Your Name <your.email@example.com>"]
+description = "APRS daemon with I-gate and digipeater functionality"
+license = "MIT"
+
+[dependencies]
+tokio = { version = "1.41", features = ["full"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+toml = "0.8"
+chrono = "0.4"
+log = "0.4"
+env_logger = "0.11"
+bytes = "1.8"
+thiserror = "2.0"
+anyhow = "1.0"
+clap = { version = "4.5", features = ["derive"] }
+regex = "1.11"
+lazy_static = "1.5"
+async-trait = "0.1"
+futures = "0.3"
+nmea = "0.6"
+libc = "0.2"
+nix = { version = "0.29", features = ["term", "fs"] }
+
+[dev-dependencies]
+tokio-test = "0.4"
+mockall = "0.13"
+serial_test = "3.2"
+tempfile = "3.14"
+assert_matches = "1.5"
+proptest = "1.6"
+criterion = "0.5"
+pretty_assertions = "1.4"
+test-case = "3.3"
+rstest = "0.23"
+
+[profile.test]
+opt-level = 0
+debug = true
+
+[profile.dev]
+opt-level = 0
+debug = true
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
+strip = true
