@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2021"
 authors = ["Your Name <your.email@example.com>"]
 description = "APRS daemon with I-gate and digipeater functionality"
-license = "MIT"
+license = "GPL-3.0-or-later"
 
 [dependencies]
 tokio = { version = "1.41", features = ["full"] }

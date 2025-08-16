@@ -53,7 +53,9 @@ jobs:
             devscripts \
             dpkg-dev \
             lintian \
-            fakeroot
+            fakeroot \
+            build-essential \
+            pkg-config
       
       - name: Prepare version
         id: version
@@ -84,7 +86,13 @@ jobs:
           CARGO_TARGET_ARMV7_UNKNOWN_LINUX_GNUEABIHF_LINKER: arm-linux-gnueabihf-gcc
           CC_aarch64_unknown_linux_gnu: aarch64-linux-gnu-gcc
           CC_armv7_unknown_linux_gnueabihf: arm-linux-gnueabihf-gcc
+          AR_aarch64_unknown_linux_gnu: aarch64-linux-gnu-ar
+          AR_armv7_unknown_linux_gnueabihf: arm-linux-gnueabihf-ar
         run: |
+          # Debug information
+          echo "Building for: ${{ matrix.arch.deb }} / ${{ matrix.arch.rust }}"
+          echo "Debian version: ${{ matrix.debian_version.codename }}"
+          
           export DEB_BUILD_OPTIONS="nocheck"  # Skip tests during package build
           export CARGO_TARGET_DIR=target
           
@@ -98,30 +106,58 @@ jobs:
           linker = "arm-linux-gnueabihf-gcc"
           EOF
           
+          # Set architecture for dpkg
+          export DEB_HOST_ARCH=${{ matrix.arch.deb }}
+          
           # Build binary package
           if [ "${{ matrix.arch.deb }}" == "amd64" ]; then
             dpkg-buildpackage -us -uc -b
           else
-            dpkg-buildpackage -us -uc -b -a${{ matrix.arch.deb }}
+            # For cross-compilation, we need to set the host architecture
+            dpkg-buildpackage -us -uc -b --host-arch=${{ matrix.arch.deb }}
           fi
       
       - name: Check package
         run: |
           # List built packages
-          ls -la ../*.deb
+          echo "Looking for packages in parent directory:"
+          ls -la ../
+          
+          # Find the actual .deb file
+          DEB_COUNT=$(find .. -name "*.deb" -type f | wc -l)
+          echo "Found $DEB_COUNT .deb files"
+          
+          if [ "$DEB_COUNT" -eq 0 ]; then
+            echo "ERROR: No .deb packages found!"
+            exit 1
+          fi
+          
+          # List all .deb files
+          find .. -name "*.deb" -type f -exec ls -la {} \;
           
           # Run lintian (allow warnings)
-          lintian ../*.deb || true
+          find .. -name "*.deb" -type f -exec lintian {} \; || true
           
-          # Show package info
-          dpkg-deb -I ../*.deb
-          dpkg-deb -c ../*.deb
+          # Show package info for each .deb
+          find .. -name "*.deb" -type f -exec dpkg-deb -I {} \;
       
       - name: Rename package
         run: |
-          DEB_FILE=$(ls ../*.deb | head -n1)
+          # Find the .deb file (should be only one)
+          DEB_FILE=$(find .. -name "*.deb" -type f | head -n1)
+          
+          if [ -z "$DEB_FILE" ]; then
+            echo "ERROR: No .deb file found to rename!"
+            exit 1
+          fi
+          
+          echo "Found package: $DEB_FILE"
+          
+          # Copy to current directory with new name
           NEW_NAME="aprstx_${{ steps.version.outputs.VERSION }}_${{ matrix.debian_version.codename }}_${{ matrix.arch.deb }}.deb"
-          mv "$DEB_FILE" "$NEW_NAME"
+          cp "$DEB_FILE" "$NEW_NAME"
+          
+          echo "Renamed to: $NEW_NAME"
           echo "DEB_PACKAGE=$NEW_NAME" >> $GITHUB_ENV
       
       - name: Upload artifact
