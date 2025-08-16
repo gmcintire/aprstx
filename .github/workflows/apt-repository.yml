@@ -326,10 +326,33 @@ jobs:
           sed -i "s|\${GITHUB_REPOSITORY}|${GITHUB_REPOSITORY}|g" apt/install.sh
           chmod +x apt/install.sh
       
+      - name: Prepare for GitHub Pages deployment
+        run: |
+          # Create a directory structure for subdirectory deployment
+          mkdir -p pages-deploy/aprstx
+          cp -r apt/* pages-deploy/aprstx/
+          
+          # Create a simple redirect index at root if needed
+          cat > pages-deploy/index.html << 'EOF'
+          <!DOCTYPE html>
+          <html>
+          <head>
+              <title>gmcintire.github.io</title>
+              <meta charset="utf-8">
+          </head>
+          <body>
+              <h1>Projects</h1>
+              <ul>
+                  <li><a href="/aprstx/">APRS Daemon (aprstx) - APT Repository</a></li>
+              </ul>
+          </body>
+          </html>
+          EOF
+      
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: apt
+          path: pages-deploy
   
   deploy-pages:
     name: Deploy to GitHub Pages

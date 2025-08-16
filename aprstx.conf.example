@@ -6,7 +6,11 @@ mycall = "N0CALL-10"
 # Serial port configuration
 [[serial_ports]]
 name = "vhf"
-device = "/dev/ttyUSB0"
+device = "/dev/ttyUSB0"  # Common USB-serial adapter
+# device = "/dev/ttyAMA0" # Raspberry Pi GPIO UART (Pi 4 and older)
+# device = "/dev/ttyS0"   # Raspberry Pi GPIO UART (Pi 5)
+# device = "/dev/tnc-usb" # Udev symlink for USB TNCs
+# device = "/dev/tnc-gpio" # Udev symlink for GPIO UART
 baud_rate = 9600
 protocol = "kiss"
 tx_enable = true

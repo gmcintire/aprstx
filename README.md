@@ -61,6 +61,25 @@ The Debian package will:
 - Install udev rules for common TNC devices
 - Enable automatic updates via apt
 
+### Raspberry Pi Installation
+
+The APT repository includes pre-built binaries for Raspberry Pi:
+
+- **Raspberry Pi 4**: Use either `armhf` (32-bit) or `arm64` (64-bit) packages
+- **Raspberry Pi 5**: Use `arm64` (64-bit) packages only
+
+The installation script automatically detects your Pi's architecture:
+
+```bash
+# Same installation command works on all Raspberry Pi models
+curl -fsSL https://gmcintire.github.io/aprstx/install.sh | sudo bash
+```
+
+For optimal performance on Raspberry Pi:
+- Use 64-bit Raspberry Pi OS when possible (better performance)
+- The `arm64` binaries are optimized for newer Pi models
+- Serial port performance is excellent on all Pi models
+
 ### Building from Source
 
 aprstx is written in pure Rust with no system package dependencies required!

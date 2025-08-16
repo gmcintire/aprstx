@@ -28,3 +28,12 @@ KERNEL=="ttyACM[0-9]*", GROUP="dialout", MODE="0660"
 # Raspberry Pi serial ports
 KERNEL=="ttyAMA[0-9]*", GROUP="dialout", MODE="0660"
 KERNEL=="ttyS[0-9]*", GROUP="dialout", MODE="0660"
+
+# Raspberry Pi GPIO UART
+SUBSYSTEM=="tty", KERNEL=="ttyAMA0", GROUP="dialout", MODE="0660", SYMLINK+="tnc-gpio"
+SUBSYSTEM=="tty", KERNEL=="ttyS0", GROUP="dialout", MODE="0660", SYMLINK+="tnc-gpio"
+
+# Common USB-Serial adapters used with Raspberry Pi
+SUBSYSTEM=="tty", ATTRS{idVendor}=="0403", ATTRS{idProduct}=="6001", GROUP="dialout", MODE="0660", SYMLINK+="tnc-usb"
+SUBSYSTEM=="tty", ATTRS{idVendor}=="067b", ATTRS{idProduct}=="2303", GROUP="dialout", MODE="0660", SYMLINK+="tnc-usb"
+SUBSYSTEM=="tty", ATTRS{idVendor}=="10c4", ATTRS{idProduct}=="ea60", GROUP="dialout", MODE="0660", SYMLINK+="tnc-usb"
