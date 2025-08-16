@@ -1,0 +1,29 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+  packages: write
+  pages: write
+  id-token: write
+
+jobs:
+  # First, build all the packages
+  build-packages:
+    uses: ./.github/workflows/debian-packages.yml
+    permissions:
+      contents: write
+      packages: write
+  
+  # Then, create the APT repository
+  create-apt-repo:
+    needs: build-packages
+    uses: ./.github/workflows/apt-repository.yml
+    permissions:
+      contents: write
+      pages: write
+      id-token: write

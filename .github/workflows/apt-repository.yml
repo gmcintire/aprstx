@@ -1,14 +1,8 @@
 name: APT Repository
 
 on:
-  push:
-    tags:
-      - 'v*'
   workflow_dispatch:
-  workflow_run:
-    workflows: ["Build Debian Packages"]
-    types:
-      - completed
+  workflow_call:
 
 permissions:
   contents: write
@@ -19,7 +13,6 @@ jobs:
   build-repository:
     name: Build APT Repository
     runs-on: ubuntu-latest
-    if: ${{ github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success' }}
     
     steps:
       - name: Checkout repository
@@ -57,29 +50,33 @@ jobs:
           gpg --armor --export aprstx-repo@github.io > repository-key.asc
           echo "GPG_HOME=$GNUPGHOME" >> $GITHUB_OUTPUT
           
-      - name: Download all release assets
-        if: startsWith(github.ref, 'refs/tags/')
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          # Get the release
-          RELEASE_TAG=${GITHUB_REF#refs/tags/}
-          
-          # Create directory for packages
-          mkdir -p packages
-          
-          # Download all .deb files from the release
-          gh release download "$RELEASE_TAG" --pattern "*.deb" --dir packages || true
-          
-          # List downloaded packages
-          ls -la packages/
-      
-      - name: Download workflow artifacts
-        if: github.event_name == 'workflow_dispatch'
+      - name: Download packages
         uses: actions/download-artifact@v4
         with:
           path: packages
           pattern: aprstx-*
+        continue-on-error: true
+      
+      - name: Download release assets if available
+        if: startsWith(github.ref, 'refs/tags/')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # Get the release tag
+          RELEASE_TAG=${GITHUB_REF#refs/tags/}
+          
+          # Create directory for packages if not exists
+          mkdir -p packages
+          
+          # Try to download from release if it exists
+          if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
+            echo "Downloading assets from release $RELEASE_TAG"
+            gh release download "$RELEASE_TAG" --pattern "*.deb" --dir packages || echo "No .deb files found in release"
+          fi
+          
+          # List all packages
+          echo "Available packages:"
+          find packages -name "*.deb" -type f | sort || echo "No packages found"
       
       - name: Create APT repository structure
         env:
@@ -134,29 +131,40 @@ jobs:
         run: |
           cd apt
           
-          # Find and add all .deb files
-          find ../packages -name "*.deb" -type f | while read deb; do
-            echo "Processing $deb..."
+          # Check if we have any packages
+          if [ -z "$(find ../packages -name "*.deb" -type f 2>/dev/null)" ]; then
+            echo "No .deb packages found to add to repository"
+            echo "Creating empty repository structure..."
             
-            # Extract codename from filename (assumes format: aprstx_version_codename_arch.deb)
-            codename=$(basename "$deb" | cut -d'_' -f3)
+            # Create empty repository
+            for dist in bullseye bookworm trixie; do
+              reprepro export "$dist" || true
+            done
+          else
+            # Find and add all .deb files
+            find ../packages -name "*.deb" -type f | while read deb; do
+              echo "Processing $deb..."
+              
+              # Extract codename from filename (assumes format: aprstx_version_codename_arch.deb)
+              codename=$(basename "$deb" | cut -d'_' -f3)
+              
+              # Add to appropriate distribution
+              case "$codename" in
+                bullseye|bookworm|trixie)
+                  reprepro includedeb "$codename" "$deb" || echo "Failed to add $deb to $codename"
+                  ;;
+                *)
+                  echo "Unknown codename: $codename, trying all distributions"
+                  for dist in bullseye bookworm trixie; do
+                    reprepro includedeb "$dist" "$deb" || true
+                  done
+                  ;;
+              esac
+            done
             
-            # Add to appropriate distribution
-            case "$codename" in
-              bullseye|bookworm|trixie)
-                reprepro includedeb "$codename" "$deb" || echo "Failed to add $deb to $codename"
-                ;;
-              *)
-                echo "Unknown codename: $codename, trying all distributions"
-                for dist in bullseye bookworm trixie; do
-                  reprepro includedeb "$dist" "$deb" || true
-                done
-                ;;
-            esac
-          done
-          
-          # Generate repository metadata
-          reprepro export
+            # Generate repository metadata
+            reprepro export
+          fi
       
       - name: Create index.html for GitHub Pages
         run: |

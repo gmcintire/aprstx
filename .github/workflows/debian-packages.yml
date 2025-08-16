@@ -1,11 +1,8 @@
 name: Build Debian Packages
 
 on:
-  push:
-    tags:
-      - 'v*'
-      - 'debian/*'
   workflow_dispatch:
+  workflow_call:
 
 permissions:
   contents: write
