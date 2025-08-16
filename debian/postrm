@@ -1,0 +1,35 @@
+#!/bin/sh
+set -e
+
+case "$1" in
+    purge)
+        # Remove system user on purge
+        if getent passwd aprstx > /dev/null; then
+            echo "Removing system user 'aprstx'..."
+            deluser --quiet aprstx || true
+        fi
+        
+        # Remove data directory on purge
+        if [ -d /var/lib/aprstx ]; then
+            echo "Removing data directory..."
+            rm -rf /var/lib/aprstx
+        fi
+        
+        # Remove config directory on purge (if empty)
+        if [ -d /etc/aprstx ]; then
+            rmdir --ignore-fail-on-non-empty /etc/aprstx || true
+        fi
+        ;;
+    
+    remove|upgrade|failed-upgrade|abort-install|abort-upgrade|disappear)
+        ;;
+    
+    *)
+        echo "postrm called with unknown argument '$1'" >&2
+        exit 1
+        ;;
+esac
+
+#DEBHELPER#
+
+exit 0

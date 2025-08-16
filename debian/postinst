@@ -1,0 +1,57 @@
+#!/bin/sh
+set -e
+
+case "$1" in
+    configure)
+        # Create system user for aprstx if it doesn't exist
+        if ! getent passwd aprstx > /dev/null; then
+            echo "Creating system user 'aprstx'..."
+            adduser --system --group --home /var/lib/aprstx --no-create-home \
+                    --gecos "APRS Daemon" --disabled-login aprstx
+        fi
+        
+        # Add aprstx user to dialout group for serial port access
+        if ! groups aprstx | grep -q dialout; then
+            echo "Adding aprstx user to dialout group..."
+            usermod -a -G dialout aprstx
+        fi
+        
+        # Create data directory
+        if [ ! -d /var/lib/aprstx ]; then
+            mkdir -p /var/lib/aprstx
+            chown aprstx:aprstx /var/lib/aprstx
+            chmod 755 /var/lib/aprstx
+        fi
+        
+        # Create config directory
+        if [ ! -d /etc/aprstx ]; then
+            mkdir -p /etc/aprstx
+            chmod 755 /etc/aprstx
+        fi
+        
+        # Copy example config if no config exists
+        if [ ! -f /etc/aprstx/aprstx.conf ]; then
+            if [ -f /etc/aprstx/aprstx.conf.example ]; then
+                echo "Installing default configuration..."
+                cp /etc/aprstx/aprstx.conf.example /etc/aprstx/aprstx.conf
+                chmod 644 /etc/aprstx/aprstx.conf
+                echo ""
+                echo "Default configuration installed at /etc/aprstx/aprstx.conf"
+                echo "Please edit this file to configure your callsign and interfaces."
+                echo ""
+            fi
+        fi
+        ;;
+    
+    abort-upgrade|abort-remove|abort-deconfigure)
+        ;;
+    
+    *)
+        echo "postinst called with unknown argument '$1'" >&2
+        exit 1
+        ;;
+esac
+
+#DEBHELPER#
+
+exit 0

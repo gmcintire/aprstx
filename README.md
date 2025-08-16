@@ -15,11 +15,31 @@ A high-performance APRS (Automatic Packet Reporting System) daemon written in Ru
 - **Mobile Operation**: Full functionality while moving between locations
 - **Async Architecture**: Built on Tokio for high performance
 
-## Building
+## Installation
+
+### Debian/Ubuntu Package Installation (Recommended)
+
+For Debian 11 (Bullseye), 12 (Bookworm), or 13 (Trixie):
+
+```bash
+# Quick install script
+wget -qO- https://github.com/yourusername/aprstx/releases/latest/download/install-aprstx.sh | bash
+
+# Or download the .deb package manually from releases and install:
+sudo dpkg -i aprstx_*.deb
+sudo apt-get install -f  # Install dependencies if needed
+```
+
+The Debian package will:
+- Install the binary to `/usr/bin/aprstx`
+- Create a system user `aprstx` with access to serial ports
+- Install a systemd service
+- Set up proper permissions (no sudo required!)
+- Install udev rules for common TNC devices
+
+### Building from Source
 
 aprstx is written in pure Rust with no system package dependencies required!
-
-### Build
 
 ```bash
 cargo build --release
@@ -29,7 +49,13 @@ The binary will be created at `target/release/aprstx`
 
 ## Configuration
 
-Copy `aprstx.conf.example` to `/etc/aprstx.conf` and edit for your setup:
+For Debian package installations, edit `/etc/aprstx/aprstx.conf`:
+
+```bash
+sudo nano /etc/aprstx/aprstx.conf
+```
+
+For manual installations, copy `aprstx.conf.example` to `/etc/aprstx.conf` and edit:
 
 ```toml
 mycall = "N0CALL-10"
@@ -61,8 +87,26 @@ max_hops = 3
 
 ## Running
 
+### Debian Package Installation
+
 ```bash
-# Run with default config
+# Start the service
+sudo systemctl start aprstx
+
+# Enable at boot
+sudo systemctl enable aprstx
+
+# Check status
+sudo systemctl status aprstx
+
+# View logs
+sudo journalctl -u aprstx -f
+```
+
+### Manual Installation
+
+```bash
+# Run with default config (requires sudo for serial port access)
 sudo ./target/release/aprstx
 
 # Run with custom config
@@ -74,6 +118,8 @@ sudo ./target/release/aprstx --debug
 # Run in foreground
 sudo ./target/release/aprstx --foreground
 ```
+
+Note: The Debian package configures the service to run as the `aprstx` user with proper permissions, so sudo is not required when using systemctl.
 
 ## GPS Configuration
 
@@ -133,4 +179,4 @@ aprstx is designed for mobile operation:
 
 ## License
 
-MIT License - See LICENSE file for details
+GNU General Public License v3.0 (GPLv3) - See LICENSE.md file for details

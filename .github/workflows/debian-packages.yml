@@ -1,0 +1,343 @@
+name: Build Debian Packages
+
+on:
+  push:
+    tags:
+      - 'v*'
+      - 'debian/*'
+  workflow_dispatch:
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build-deb:
+    name: Build Debian Package
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        debian_version:
+          - {codename: bullseye, version: 11}
+          - {codename: bookworm, version: 12}
+          - {codename: trixie, version: 13}
+        arch:
+          - {rust: x86_64-unknown-linux-gnu, deb: amd64}
+          - {rust: aarch64-unknown-linux-gnu, deb: arm64}
+          - {rust: armv7-unknown-linux-gnueabihf, deb: armhf}
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.arch.rust }}
+      
+      - name: Install cross-compilation tools
+        if: matrix.arch.rust != 'x86_64-unknown-linux-gnu'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc-aarch64-linux-gnu gcc-arm-linux-gnueabihf
+      
+      - name: Install packaging dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            debhelper \
+            devscripts \
+            dpkg-dev \
+            lintian \
+            fakeroot
+      
+      - name: Prepare version
+        id: version
+        run: |
+          VERSION=${GITHUB_REF#refs/tags/}
+          if [[ "$VERSION" == refs/* ]]; then
+            VERSION="0.1.0+git$(git rev-parse --short HEAD)"
+          else
+            VERSION=${VERSION#v}
+          fi
+          echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
+          echo "DEB_VERSION=${VERSION}-1~${{ matrix.debian_version.codename }}" >> $GITHUB_OUTPUT
+      
+      - name: Update changelog
+        run: |
+          cat > debian/changelog << EOF
+          aprstx (${{ steps.version.outputs.DEB_VERSION }}) ${{ matrix.debian_version.codename }}; urgency=medium
+          
+            * Release for Debian ${{ matrix.debian_version.version }} (${{ matrix.debian_version.codename }})
+            * Built from git tag/ref: ${GITHUB_REF}
+          
+           -- GitHub Actions <actions@github.com>  $(date -R)
+          EOF
+      
+      - name: Build package
+        env:
+          CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER: aarch64-linux-gnu-gcc
+          CARGO_TARGET_ARMV7_UNKNOWN_LINUX_GNUEABIHF_LINKER: arm-linux-gnueabihf-gcc
+        run: |
+          export DEB_BUILD_OPTIONS="nocheck"  # Skip tests during package build
+          export CARGO_TARGET_DIR=target
+          
+          # Override architecture in control file for cross-compilation
+          if [ "${{ matrix.arch.deb }}" != "amd64" ]; then
+            sed -i "s/Architecture: any/Architecture: ${{ matrix.arch.deb }}/" debian/control
+          fi
+          
+          # Build source package
+          dpkg-source -b .
+          
+          # Build binary package
+          if [ "${{ matrix.arch.deb }}" == "amd64" ]; then
+            dpkg-buildpackage -us -uc -b
+          else
+            dpkg-buildpackage -us -uc -b -a${{ matrix.arch.deb }} --target-arch=${{ matrix.arch.deb }}
+          fi
+      
+      - name: Check package
+        run: |
+          # List built packages
+          ls -la ../*.deb
+          
+          # Run lintian (allow warnings)
+          lintian ../*.deb || true
+          
+          # Show package info
+          dpkg-deb -I ../*.deb
+          dpkg-deb -c ../*.deb
+      
+      - name: Rename package
+        run: |
+          DEB_FILE=$(ls ../*.deb | head -n1)
+          NEW_NAME="aprstx_${{ steps.version.outputs.VERSION }}_${{ matrix.debian_version.codename }}_${{ matrix.arch.deb }}.deb"
+          mv "$DEB_FILE" "$NEW_NAME"
+          echo "DEB_PACKAGE=$NEW_NAME" >> $GITHUB_ENV
+      
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: aprstx-${{ matrix.debian_version.codename }}-${{ matrix.arch.deb }}
+          path: ${{ env.DEB_PACKAGE }}
+  
+  create-apt-repository:
+    name: Create APT Repository
+    needs: build-deb
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: packages
+      
+      - name: Install repository tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y reprepro gnupg
+      
+      - name: Create repository structure
+        run: |
+          mkdir -p apt-repo/{conf,dists,pool}
+          
+          # Create distributions file
+          cat > apt-repo/conf/distributions << EOF
+          Origin: aprstx
+          Label: APRS Daemon Repository
+          Codename: bullseye
+          Architectures: amd64 arm64 armhf source
+          Components: main
+          Description: APT repository for aprstx
+          
+          Origin: aprstx
+          Label: APRS Daemon Repository
+          Codename: bookworm
+          Architectures: amd64 arm64 armhf source
+          Components: main
+          Description: APT repository for aprstx
+          
+          Origin: aprstx
+          Label: APRS Daemon Repository
+          Codename: trixie
+          Architectures: amd64 arm64 armhf source
+          Components: main
+          Description: APT repository for aprstx
+          EOF
+      
+      - name: Add packages to repository
+        run: |
+          cd apt-repo
+          for deb in ../packages/*/*.deb; do
+            echo "Adding $deb to repository..."
+            reprepro includedeb bullseye "$deb" || \
+            reprepro includedeb bookworm "$deb" || \
+            reprepro includedeb trixie "$deb" || true
+          done
+      
+      - name: Create repository archive
+        run: |
+          tar czf apt-repository.tar.gz -C apt-repo .
+      
+      - name: Upload repository archive
+        uses: actions/upload-artifact@v4
+        with:
+          name: apt-repository
+          path: apt-repository.tar.gz
+  
+  release:
+    name: Create Release
+    needs: [build-deb, create-apt-repository]
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+    
+    steps:
+      - name: Download all packages
+        uses: actions/download-artifact@v4
+        with:
+          path: release
+      
+      - name: Create installation script
+        run: |
+          cat > install-aprstx.sh << 'EOF'
+          #!/bin/bash
+          set -e
+          
+          echo "APRS Daemon (aprstx) Installer"
+          echo "==============================="
+          echo
+          
+          # Detect architecture
+          ARCH=$(dpkg --print-architecture)
+          
+          # Detect Debian version
+          if [ -f /etc/os-release ]; then
+              . /etc/os-release
+              DISTRO=$VERSION_CODENAME
+          else
+              echo "Cannot detect Debian version"
+              exit 1
+          fi
+          
+          # Check if supported
+          case "$DISTRO" in
+              bullseye|bookworm|trixie)
+                  echo "Detected: Debian $VERSION_ID ($DISTRO) on $ARCH"
+                  ;;
+              *)
+                  echo "Unsupported Debian version: $DISTRO"
+                  echo "Supported versions: bullseye (11), bookworm (12), trixie (13)"
+                  exit 1
+                  ;;
+          esac
+          
+          # Download package
+          PACKAGE="aprstx_VERSION_${DISTRO}_${ARCH}.deb"
+          URL="https://github.com/GITHUB_REPOSITORY/releases/latest/download/$PACKAGE"
+          
+          echo "Downloading $PACKAGE..."
+          if ! wget -q "$URL" -O "/tmp/$PACKAGE"; then
+              echo "Failed to download package"
+              echo "URL: $URL"
+              exit 1
+          fi
+          
+          # Install package
+          echo "Installing package..."
+          sudo dpkg -i "/tmp/$PACKAGE" || sudo apt-get install -f -y
+          
+          # Clean up
+          rm -f "/tmp/$PACKAGE"
+          
+          echo
+          echo "Installation complete!"
+          echo
+          echo "Next steps:"
+          echo "1. Edit the configuration file: sudo nano /etc/aprstx/aprstx.conf"
+          echo "2. Enable the service: sudo systemctl enable aprstx"
+          echo "3. Start the service: sudo systemctl start aprstx"
+          echo "4. Check status: sudo systemctl status aprstx"
+          echo
+          EOF
+          
+          # Replace placeholders
+          VERSION=${GITHUB_REF#refs/tags/v}
+          sed -i "s/VERSION/$VERSION/g" install-aprstx.sh
+          sed -i "s|GITHUB_REPOSITORY|$GITHUB_REPOSITORY|g" install-aprstx.sh
+          chmod +x install-aprstx.sh
+      
+      - name: Create release notes
+        run: |
+          cat > RELEASE_NOTES.md << EOF
+          # APRS Daemon (aprstx) Release
+          
+          ## Installation
+          
+          ### Quick Install (Recommended)
+          
+          Download and run the installation script:
+          \`\`\`bash
+          wget -qO- https://github.com/$GITHUB_REPOSITORY/releases/latest/download/install-aprstx.sh | bash
+          \`\`\`
+          
+          ### Manual Installation
+          
+          1. Download the appropriate .deb package for your system:
+             - Debian 11 (Bullseye): \`aprstx_*_bullseye_*.deb\`
+             - Debian 12 (Bookworm): \`aprstx_*_bookworm_*.deb\`
+             - Debian 13 (Trixie): \`aprstx_*_trixie_*.deb\`
+          
+          2. Install the package:
+             \`\`\`bash
+             sudo dpkg -i aprstx_*.deb
+             sudo apt-get install -f  # Install dependencies if needed
+             \`\`\`
+          
+          ### Post-Installation
+          
+          1. Edit the configuration file:
+             \`\`\`bash
+             sudo nano /etc/aprstx/aprstx.conf
+             \`\`\`
+          
+          2. Start the service:
+             \`\`\`bash
+             sudo systemctl enable aprstx
+             sudo systemctl start aprstx
+             \`\`\`
+          
+          ## Features
+          
+          - Multiple serial port TNC support (KISS and TNC2 protocols)
+          - APRS-IS network connectivity
+          - Smart beaconing with configurable parameters
+          - Digipeater functionality
+          - GPS support (serial NMEA, GPSD, or fixed position)
+          - Message handling with acknowledgments
+          - No sudo required - runs as dedicated system user
+          
+          ## System Requirements
+          
+          - Debian 11, 12, or 13
+          - Architecture: amd64, arm64, or armhf
+          - Serial port access (user will be added to dialout group)
+          
+          ## Troubleshooting
+          
+          Check service status:
+          \`\`\`bash
+          sudo systemctl status aprstx
+          sudo journalctl -u aprstx -f
+          \`\`\`
+          EOF
+      
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          body_path: RELEASE_NOTES.md
+          files: |
+            release/*/*.deb
+            release/apt-repository/apt-repository.tar.gz
+            install-aprstx.sh
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

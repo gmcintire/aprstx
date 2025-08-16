@@ -1,0 +1,30 @@
+# udev rules for APRS TNC devices
+# This file allows the aprstx daemon to access serial devices without root privileges
+
+# Generic USB serial devices
+SUBSYSTEM=="tty", ATTRS{idVendor}=="0403", ATTRS{idProduct}=="6001", GROUP="dialout", MODE="0660"
+SUBSYSTEM=="tty", ATTRS{idVendor}=="067b", ATTRS{idProduct}=="2303", GROUP="dialout", MODE="0660"
+SUBSYSTEM=="tty", ATTRS{idVendor}=="10c4", ATTRS{idProduct}=="ea60", GROUP="dialout", MODE="0660"
+
+# Common TNC devices
+# Kantronics
+SUBSYSTEM=="tty", ATTRS{idVendor}=="0403", ATTRS{idProduct}=="6015", GROUP="dialout", MODE="0660", SYMLINK+="tnc-kantronics"
+
+# TNC-X
+SUBSYSTEM=="tty", ATTRS{idVendor}=="0403", ATTRS{idProduct}=="f448", GROUP="dialout", MODE="0660", SYMLINK+="tnc-x"
+
+# Mobilinkd
+SUBSYSTEM=="tty", ATTRS{idVendor}=="1a86", ATTRS{idProduct}=="7523", GROUP="dialout", MODE="0660", SYMLINK+="tnc-mobilinkd"
+
+# Arduino-based TNCs (common chips)
+SUBSYSTEM=="tty", ATTRS{idVendor}=="2341", GROUP="dialout", MODE="0660"
+SUBSYSTEM=="tty", ATTRS{idVendor}=="1a86", ATTRS{idProduct}=="7523", GROUP="dialout", MODE="0660"
+SUBSYSTEM=="tty", ATTRS{idVendor}=="0403", ATTRS{idProduct}=="6001", GROUP="dialout", MODE="0660"
+
+# Ensure all USB serial devices are accessible
+KERNEL=="ttyUSB[0-9]*", GROUP="dialout", MODE="0660"
+KERNEL=="ttyACM[0-9]*", GROUP="dialout", MODE="0660"
+
+# Raspberry Pi serial ports
+KERNEL=="ttyAMA[0-9]*", GROUP="dialout", MODE="0660"
+KERNEL=="ttyS[0-9]*", GROUP="dialout", MODE="0660"

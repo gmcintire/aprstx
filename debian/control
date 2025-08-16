@@ -1,0 +1,35 @@
+Source: aprstx
+Section: hamradio
+Priority: optional
+Maintainer: Your Name <your.email@example.com>
+Build-Depends: debhelper-compat (= 13),
+               cargo,
+               rustc (>= 1.70),
+               pkg-config,
+               libudev-dev
+Standards-Version: 4.6.2
+Homepage: https://github.com/yourusername/aprstx
+Vcs-Browser: https://github.com/yourusername/aprstx
+Vcs-Git: https://github.com/yourusername/aprstx.git
+Rules-Requires-Root: no
+
+Package: aprstx
+Architecture: any
+Depends: ${shlibs:Depends},
+         ${misc:Depends},
+         adduser
+Recommends: gpsd
+Description: APRS daemon for packet radio operations
+ aprstx is a comprehensive APRS (Automatic Packet Reporting System) daemon
+ written in Rust. It supports multiple TNC interfaces, APRS-IS connectivity,
+ smart beaconing, digipeating, and GPS integration.
+ .
+ Features include:
+  - Multiple serial port TNC support (KISS and TNC2 protocols)
+  - APRS-IS network connectivity
+  - Smart beaconing with configurable parameters
+  - Digipeater functionality with viscous delay
+  - GPS support (serial NMEA, GPSD, or fixed position)
+  - Message handling with acknowledgments
+  - Flexible packet filtering
+  - Pure Rust implementation without system dependencies

@@ -1,0 +1,24 @@
+#!/bin/sh
+set -e
+
+case "$1" in
+    remove|upgrade|deconfigure)
+        # Stop the service if it's running
+        if systemctl is-active --quiet aprstx.service; then
+            echo "Stopping aprstx service..."
+            systemctl stop aprstx.service || true
+        fi
+        ;;
+    
+    failed-upgrade)
+        ;;
+    
+    *)
+        echo "prerm called with unknown argument '$1'" >&2
+        exit 1
+        ;;
+esac
+
+#DEBHELPER#
+
+exit 0
