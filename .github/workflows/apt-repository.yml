@@ -211,16 +211,16 @@ jobs:
               
               <div class="install-box">
                   <p>Run this command to add the repository and install aprstx:</p>
-                  <pre>curl -fsSL https://${GITHUB_REPOSITORY_OWNER}.github.io/${GITHUB_REPOSITORY#*/}/install.sh | sudo bash</pre>
+                  <pre>curl -fsSL https://gmcintire.github.io/aprstx/install.sh | sudo bash</pre>
               </div>
               
               <h2>Manual Installation</h2>
               
               <h3>1. Add the repository key</h3>
-              <pre>curl -fsSL https://${GITHUB_REPOSITORY_OWNER}.github.io/${GITHUB_REPOSITORY#*/}/repository-key.asc | sudo apt-key add -</pre>
+              <pre>curl -fsSL https://gmcintire.github.io/aprstx/repository-key.asc | sudo apt-key add -</pre>
               
               <h3>2. Add the repository to your sources</h3>
-              <pre>echo "deb https://${GITHUB_REPOSITORY_OWNER}.github.io/${GITHUB_REPOSITORY#*/} $(lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/aprstx.list</pre>
+              <pre>echo "deb https://gmcintire.github.io/aprstx $(lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/aprstx.list</pre>
               
               <h3>3. Update and install</h3>
               <pre>sudo apt update
@@ -248,14 +248,10 @@ jobs:
               </ul>
               
               <h2>More Information</h2>
-              <p>For more information about aprstx, visit the <a href="https://github.com/${GITHUB_REPOSITORY}">GitHub repository</a>.</p>
+              <p>For more information about aprstx, visit the <a href="https://github.com/gmcintire/aprstx">GitHub repository</a>.</p>
           </body>
           </html>
           EOF
-          
-          # Replace variables
-          sed -i "s|\${GITHUB_REPOSITORY_OWNER}|${GITHUB_REPOSITORY_OWNER}|g" apt/index.html
-          sed -i "s|\${GITHUB_REPOSITORY}|${GITHUB_REPOSITORY}|g" apt/index.html
       
       - name: Create installation script
         run: |
@@ -296,11 +292,11 @@ jobs:
           
           # Add repository key
           echo "Adding repository key..."
-          curl -fsSL https://${GITHUB_REPOSITORY_OWNER}.github.io/${GITHUB_REPOSITORY#*/}/repository-key.asc | apt-key add -
+          curl -fsSL https://gmcintire.github.io/aprstx/repository-key.asc | apt-key add -
           
           # Add repository
           echo "Adding repository..."
-          echo "deb https://${GITHUB_REPOSITORY_OWNER}.github.io/${GITHUB_REPOSITORY#*/} $DISTRO main" > /etc/apt/sources.list.d/aprstx.list
+          echo "deb https://gmcintire.github.io/aprstx $DISTRO main" > /etc/apt/sources.list.d/aprstx.list
           
           # Update package list
           echo "Updating package list..."
@@ -321,9 +317,6 @@ jobs:
           echo
           EOF
           
-          # Replace variables
-          sed -i "s|\${GITHUB_REPOSITORY_OWNER}|${GITHUB_REPOSITORY_OWNER}|g" apt/install.sh
-          sed -i "s|\${GITHUB_REPOSITORY}|${GITHUB_REPOSITORY}|g" apt/install.sh
           chmod +x apt/install.sh
       
       - name: Prepare for GitHub Pages deployment
