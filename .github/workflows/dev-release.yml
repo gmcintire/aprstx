@@ -1,0 +1,334 @@
+name: Dev Release
+
+on:
+  push:
+    branches:
+      - main
+      - master
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  packages: write
+  pages: write
+  id-token: write
+
+jobs:
+  # First, build all the packages with dev version
+  build-dev-packages:
+    name: Build Dev Packages
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        debian_version:
+          - {codename: bullseye, version: 11}
+          - {codename: bookworm, version: 12}
+          - {codename: trixie, version: 13}
+        arch:
+          - {rust: x86_64-unknown-linux-gnu, deb: amd64}
+          - {rust: aarch64-unknown-linux-gnu, deb: arm64}
+          - {rust: armv7-unknown-linux-gnueabihf, deb: armhf}
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.arch.rust }}
+      
+      - name: Install cross-compilation tools
+        if: matrix.arch.rust != 'x86_64-unknown-linux-gnu'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            gcc-aarch64-linux-gnu \
+            gcc-arm-linux-gnueabihf \
+            libc6-dev-arm64-cross \
+            libc6-dev-armhf-cross
+      
+      - name: Install packaging dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            debhelper \
+            devscripts \
+            dpkg-dev \
+            lintian \
+            fakeroot \
+            build-essential
+      
+      - name: Prepare dev version
+        id: version
+        run: |
+          # Create a dev version based on commit
+          BASE_VERSION=$(grep '^version' Cargo.toml | cut -d'"' -f2)
+          COMMIT_SHORT=$(git rev-parse --short HEAD)
+          TIMESTAMP=$(date +%Y%m%d%H%M%S)
+          DEV_VERSION="${BASE_VERSION}+dev.${TIMESTAMP}.${COMMIT_SHORT}"
+          
+          echo "VERSION=$DEV_VERSION" >> $GITHUB_OUTPUT
+          echo "DEB_VERSION=${DEV_VERSION}-1~${{ matrix.debian_version.codename }}" >> $GITHUB_OUTPUT
+      
+      - name: Update changelog
+        run: |
+          cat > debian/changelog << EOF
+          aprstx (${{ steps.version.outputs.DEB_VERSION }}) ${{ matrix.debian_version.codename }}; urgency=medium
+          
+            * Development build from commit ${GITHUB_SHA}
+            * Branch: ${GITHUB_REF_NAME}
+            * Built for Debian ${{ matrix.debian_version.version }} (${{ matrix.debian_version.codename }})
+          
+           -- GitHub Actions <actions@github.com>  $(date -R)
+          EOF
+      
+      - name: Build package
+        env:
+          CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER: aarch64-linux-gnu-gcc
+          CARGO_TARGET_ARMV7_UNKNOWN_LINUX_GNUEABIHF_LINKER: arm-linux-gnueabihf-gcc
+          CC_aarch64_unknown_linux_gnu: aarch64-linux-gnu-gcc
+          CC_armv7_unknown_linux_gnueabihf: arm-linux-gnueabihf-gcc
+          AR_aarch64_unknown_linux_gnu: aarch64-linux-gnu-ar
+          AR_armv7_unknown_linux_gnueabihf: arm-linux-gnueabihf-ar
+        run: |
+          export DEB_BUILD_OPTIONS="nocheck"
+          export CARGO_TARGET_DIR=target
+          export DEB_HOST_ARCH=${{ matrix.arch.deb }}
+          
+          # Set up cargo for cross-compilation
+          mkdir -p ~/.cargo
+          cat > ~/.cargo/config.toml << EOF
+          [target.aarch64-unknown-linux-gnu]
+          linker = "aarch64-linux-gnu-gcc"
+          
+          [target.armv7-unknown-linux-gnueabihf]
+          linker = "arm-linux-gnueabihf-gcc"
+          EOF
+          
+          # Build binary package with -d flag to skip dependency checks
+          if [ "${{ matrix.arch.deb }}" == "amd64" ]; then
+            dpkg-buildpackage -us -uc -b -d
+          else
+            dpkg-buildpackage -us -uc -b -d --host-arch=${{ matrix.arch.deb }}
+          fi
+      
+      - name: Rename package
+        run: |
+          # Find the .deb file
+          DEB_FILE=$(find .. -name "*.deb" -type f | head -n1)
+          
+          if [ -z "$DEB_FILE" ]; then
+            echo "ERROR: No .deb file found to rename!"
+            exit 1
+          fi
+          
+          # Copy to current directory with new name
+          NEW_NAME="aprstx-dev_${{ steps.version.outputs.VERSION }}_${{ matrix.debian_version.codename }}_${{ matrix.arch.deb }}.deb"
+          cp "$DEB_FILE" "$NEW_NAME"
+          
+          echo "DEB_PACKAGE=$NEW_NAME" >> $GITHUB_ENV
+      
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: aprstx-dev-${{ matrix.debian_version.codename }}-${{ matrix.arch.deb }}
+          path: ${{ env.DEB_PACKAGE }}
+  
+  # Deploy dev packages to a separate APT repository path
+  deploy-dev-apt:
+    name: Deploy Dev APT Repository
+    needs: build-dev-packages
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      - name: Setup GPG for package signing
+        id: gpg
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gnupg reprepro
+          
+          # Generate GPG key
+          export GNUPGHOME=$(mktemp -d)
+          cat > gpg-batch << EOF
+          %echo Generating GPG key for Dev APT repository
+          Key-Type: RSA
+          Key-Length: 4096
+          Name-Real: APRS Daemon Dev Repository
+          Name-Email: aprstx-dev@github.io
+          Expire-Date: 1y
+          %no-protection
+          %commit
+          %echo done
+          EOF
+          
+          gpg --batch --generate-key gpg-batch
+          gpg --armor --export aprstx-dev@github.io > dev-repository-key.asc
+          echo "GPG_HOME=$GNUPGHOME" >> $GITHUB_OUTPUT
+      
+      - name: Download packages
+        uses: actions/download-artifact@v4
+        with:
+          path: packages
+          pattern: aprstx-dev-*
+      
+      - name: Create Dev APT repository
+        env:
+          GNUPGHOME: ${{ steps.gpg.outputs.GPG_HOME }}
+        run: |
+          # Create repository directories
+          mkdir -p apt-dev/{conf,db,dists,pool}
+          
+          # Create distributions configuration for dev
+          cat > apt-dev/conf/distributions << 'EOF'
+          Origin: APRS Daemon Dev
+          Label: APRS Daemon Development Repository
+          Suite: dev
+          Codename: dev
+          Architectures: amd64 arm64 armhf
+          Components: main
+          Description: Development builds of APRS Daemon (aprstx)
+          SignWith: aprstx-dev@github.io
+          EOF
+          
+          # Copy public key
+          cp dev-repository-key.asc apt-dev/dev-repository-key.asc
+          
+          # Add all packages to dev repository
+          cd apt-dev
+          find ../packages -name "*.deb" -type f | while read deb; do
+            echo "Adding $deb to dev repository..."
+            reprepro includedeb dev "$deb" || echo "Failed to add $deb"
+          done
+          
+          # Generate repository metadata
+          reprepro export
+      
+      - name: Create dev index.html
+        run: |
+          cat > apt-dev/index.html << 'EOF'
+          <!DOCTYPE html>
+          <html>
+          <head>
+              <title>APRS Daemon Dev Repository</title>
+              <style>
+                  body {
+                      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+                      line-height: 1.6;
+                      color: #333;
+                      max-width: 800px;
+                      margin: 0 auto;
+                      padding: 20px;
+                  }
+                  .warning {
+                      background: #fff3cd;
+                      border: 1px solid #ffeeba;
+                      color: #856404;
+                      padding: 15px;
+                      border-radius: 5px;
+                      margin: 20px 0;
+                  }
+                  code {
+                      background: #f4f4f4;
+                      padding: 2px 5px;
+                      border-radius: 3px;
+                  }
+                  pre {
+                      background: #f4f4f4;
+                      padding: 10px;
+                      border-radius: 5px;
+                      overflow-x: auto;
+                  }
+              </style>
+          </head>
+          <body>
+              <h1>APRS Daemon Development Repository</h1>
+              
+              <div class="warning">
+                  <strong>⚠️ Warning:</strong> This repository contains development builds that are automatically 
+                  generated from the main branch. These packages may be unstable and are not recommended for 
+                  production use. For stable releases, use the 
+                  <a href="/aprstx/">main repository</a>.
+              </div>
+              
+              <h2>Add Development Repository</h2>
+              
+              <pre>
+# Add repository key
+curl -fsSL https://gmcintire.github.io/aprstx/dev/dev-repository-key.asc | sudo apt-key add -
+
+# Add dev repository
+echo "deb https://gmcintire.github.io/aprstx/dev dev main" | sudo tee /etc/apt/sources.list.d/aprstx-dev.list
+
+# Update and install dev version
+sudo apt update
+sudo apt install aprstx
+              </pre>
+              
+              <h2>Latest Build Info</h2>
+              <p>
+                  Commit: <code>${GITHUB_SHA}</code><br>
+                  Branch: <code>${GITHUB_REF_NAME}</code><br>
+                  Build Date: <code>$(date -u)</code>
+              </p>
+              
+              <h2>Repository Contents</h2>
+              <ul>
+                  <li><a href="dev-repository-key.asc">GPG Public Key</a></li>
+                  <li><a href="dists/">Package Distributions</a></li>
+                  <li><a href="pool/">Package Pool</a></li>
+              </ul>
+              
+              <p><a href="/aprstx/">← Back to stable repository</a></p>
+          </body>
+          </html>
+          EOF
+      
+      - name: Prepare for GitHub Pages deployment
+        run: |
+          # Get existing pages content if any
+          mkdir -p pages-deploy
+          
+          # Add dev repository under /aprstx/dev/
+          mkdir -p pages-deploy/aprstx/dev
+          cp -r apt-dev/* pages-deploy/aprstx/dev/
+          
+          # Create a simple index if it doesn't exist
+          if [ ! -f pages-deploy/index.html ]; then
+            cat > pages-deploy/index.html << 'EOF'
+          <!DOCTYPE html>
+          <html>
+          <head>
+              <title>gmcintire.github.io</title>
+          </head>
+          <body>
+              <h1>Projects</h1>
+              <ul>
+                  <li><a href="/aprstx/">APRS Daemon (aprstx) - Stable APT Repository</a></li>
+                  <li><a href="/aprstx/dev/">APRS Daemon (aprstx) - Development APT Repository</a></li>
+              </ul>
+          </body>
+          </html>
+          EOF
+          fi
+      
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: pages-deploy
+  
+  deploy-pages:
+    name: Deploy to GitHub Pages
+    needs: deploy-dev-apt
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

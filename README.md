@@ -40,6 +40,24 @@ sudo apt update
 sudo apt install aprstx
 ```
 
+### Development Builds
+
+Automated development builds from the main branch are available:
+
+```bash
+# Add dev repository key
+curl -fsSL https://gmcintire.github.io/aprstx/dev/dev-repository-key.asc | sudo apt-key add -
+
+# Add dev repository
+echo "deb https://gmcintire.github.io/aprstx/dev dev main" | sudo tee /etc/apt/sources.list.d/aprstx-dev.list
+
+# Install development version
+sudo apt update
+sudo apt install aprstx
+```
+
+⚠️ **Warning**: Development builds are automatically generated from each commit to main and may be unstable.
+
 ### Direct Package Download
 
 Download .deb packages directly from [GitHub Releases](https://github.com/gmcintire/aprstx/releases):

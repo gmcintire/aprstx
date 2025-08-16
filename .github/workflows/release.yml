@@ -4,6 +4,17 @@ on:
   push:
     tags:
       - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to release (e.g., 0.1.0)'
+        required: true
+        type: string
+      create_release:
+        description: 'Create GitHub release'
+        required: true
+        type: boolean
+        default: true
 
 permissions:
   contents: write
