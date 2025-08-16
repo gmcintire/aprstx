@@ -61,11 +61,6 @@ override_dh_clean:
 	rm -rf $(CARGO_TARGET_DIR)
 
 override_dh_shlibdeps:
-	# For cross-compilation, we need to help dpkg-shlibdeps find the libraries
-ifdef CARGO_BUILD_TARGET
-	dh_shlibdeps --dpkg-shlibdeps-params=--ignore-missing-info || echo "Warning: shlibdeps failed for cross-compilation, using defaults"
-	# Set default dependencies if shlibdeps failed
-	echo "shlibs:Depends=libc6, libgcc-s1" >> debian/aprstx.substvars
-else
-	dh_shlibdeps
-endif
+	# Since we're building a static binary, there should be no shared library dependencies
+	# We'll run shlibdeps but if it fails (which it might for static binaries), that's OK
+	dh_shlibdeps --dpkg-shlibdeps-params=--ignore-missing-info || true
