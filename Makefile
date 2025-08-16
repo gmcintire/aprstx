@@ -28,8 +28,9 @@ test-one:
 # Clean build artifacts
 clean:
 	@echo "Cleaning..."
-	@cargo clean
+	@if command -v cargo >/dev/null 2>&1; then cargo clean; else echo "cargo not available, skipping cargo clean"; fi
 	@rm -f tarpaulin-report.html lcov.info cobertura.xml
+	@rm -rf target/
 
 # Format code
 fmt:
