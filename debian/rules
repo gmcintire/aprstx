@@ -2,23 +2,56 @@
 
 export DH_VERBOSE = 1
 export CARGO_HOME = $(CURDIR)/debian/cargo
+export CARGO_TARGET_DIR = $(CURDIR)/target
+
+# Set cargo build flags for cross-compilation
+ifeq ($(DEB_HOST_ARCH),arm64)
+export CARGO_BUILD_TARGET = aarch64-unknown-linux-gnu
+endif
+ifeq ($(DEB_HOST_ARCH),armhf)
+export CARGO_BUILD_TARGET = armv7-unknown-linux-gnueabihf
+endif
 
 %:
 	dh $@
 
+override_dh_auto_configure:
+	# Nothing to configure
+
 override_dh_auto_build:
-	cargo build --release --locked
+	mkdir -p $(CARGO_HOME)
+ifdef CARGO_BUILD_TARGET
+	cargo build --release --target $(CARGO_BUILD_TARGET)
+else
+	cargo build --release
+endif
 
 override_dh_auto_install:
+	# Create directories
+	mkdir -p debian/aprstx/usr/bin
+	mkdir -p debian/aprstx/etc/aprstx
+	mkdir -p debian/aprstx/lib/systemd/system
+	mkdir -p debian/aprstx/lib/udev/rules.d
+	mkdir -p debian/aprstx/usr/share/doc/aprstx
+	
+	# Install files
+ifdef CARGO_BUILD_TARGET
+	install -Dm755 target/$(CARGO_BUILD_TARGET)/release/aprstx debian/aprstx/usr/bin/aprstx
+else
 	install -Dm755 target/release/aprstx debian/aprstx/usr/bin/aprstx
+endif
 	install -Dm644 aprstx.conf.example debian/aprstx/etc/aprstx/aprstx.conf.example
 	install -Dm644 debian/aprstx.service debian/aprstx/lib/systemd/system/aprstx.service
 	install -Dm644 debian/aprstx.udev debian/aprstx/lib/udev/rules.d/99-aprstx.rules
 	install -Dm644 README.md debian/aprstx/usr/share/doc/aprstx/README.md
 
 override_dh_auto_test:
-	cargo test --release --locked
+	# Skip tests during cross-compilation
+ifndef CARGO_BUILD_TARGET
+	cargo test --release
+endif
 
 override_dh_clean:
 	dh_clean
 	rm -rf $(CARGO_HOME)
+	rm -rf $(CARGO_TARGET_DIR)

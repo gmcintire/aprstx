@@ -77,23 +77,27 @@ jobs:
         env:
           CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER: aarch64-linux-gnu-gcc
           CARGO_TARGET_ARMV7_UNKNOWN_LINUX_GNUEABIHF_LINKER: arm-linux-gnueabihf-gcc
+          CC_aarch64_unknown_linux_gnu: aarch64-linux-gnu-gcc
+          CC_armv7_unknown_linux_gnueabihf: arm-linux-gnueabihf-gcc
         run: |
           export DEB_BUILD_OPTIONS="nocheck"  # Skip tests during package build
           export CARGO_TARGET_DIR=target
           
-          # Override architecture in control file for cross-compilation
-          if [ "${{ matrix.arch.deb }}" != "amd64" ]; then
-            sed -i "s/Architecture: any/Architecture: ${{ matrix.arch.deb }}/" debian/control
-          fi
+          # Set up cargo for cross-compilation
+          mkdir -p ~/.cargo
+          cat > ~/.cargo/config.toml << EOF
+          [target.aarch64-unknown-linux-gnu]
+          linker = "aarch64-linux-gnu-gcc"
           
-          # Build source package
-          dpkg-source -b .
+          [target.armv7-unknown-linux-gnueabihf]
+          linker = "arm-linux-gnueabihf-gcc"
+          EOF
           
           # Build binary package
           if [ "${{ matrix.arch.deb }}" == "amd64" ]; then
             dpkg-buildpackage -us -uc -b
           else
-            dpkg-buildpackage -us -uc -b -a${{ matrix.arch.deb }} --target-arch=${{ matrix.arch.deb }}
+            dpkg-buildpackage -us -uc -b -a${{ matrix.arch.deb }}
           fi
       
       - name: Check package
