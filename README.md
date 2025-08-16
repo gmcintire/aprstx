@@ -17,18 +17,41 @@ A high-performance APRS (Automatic Packet Reporting System) daemon written in Ru
 
 ## Installation
 
-### Debian/Ubuntu Package Installation (Recommended)
+### APT Repository Installation (Recommended)
 
 For Debian 11 (Bullseye), 12 (Bookworm), or 13 (Trixie):
 
 ```bash
-# Quick install script
-wget -qO- https://github.com/yourusername/aprstx/releases/latest/download/install-aprstx.sh | bash
+# Quick install - adds repository and installs aprstx
+curl -fsSL https://gmcintire.github.io/aprstx/install.sh | sudo bash
+```
 
-# Or download the .deb package manually from releases and install:
+Or manually add the repository:
+
+```bash
+# Add repository key
+curl -fsSL https://gmcintire.github.io/aprstx/repository-key.asc | sudo apt-key add -
+
+# Add repository to sources
+echo "deb https://gmcintire.github.io/aprstx $(lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/aprstx.list
+
+# Update and install
+sudo apt update
+sudo apt install aprstx
+```
+
+### Direct Package Download
+
+Download .deb packages directly from [GitHub Releases](https://github.com/gmcintire/aprstx/releases):
+
+```bash
+# Download and install
+wget https://github.com/gmcintire/aprstx/releases/latest/download/aprstx_VERSION_CODENAME_ARCH.deb
 sudo dpkg -i aprstx_*.deb
 sudo apt-get install -f  # Install dependencies if needed
 ```
+
+### What the Package Provides
 
 The Debian package will:
 - Install the binary to `/usr/bin/aprstx`
@@ -36,6 +59,7 @@ The Debian package will:
 - Install a systemd service
 - Set up proper permissions (no sudo required!)
 - Install udev rules for common TNC devices
+- Enable automatic updates via apt
 
 ### Building from Source
 

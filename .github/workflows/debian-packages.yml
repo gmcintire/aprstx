@@ -7,6 +7,10 @@ on:
       - 'debian/*'
   workflow_dispatch:
 
+permissions:
+  contents: write
+  packages: write
+
 env:
   CARGO_TERM_COLOR: always
 

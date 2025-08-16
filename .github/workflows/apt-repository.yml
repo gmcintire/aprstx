@@ -1,0 +1,337 @@
+name: APT Repository
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+  workflow_run:
+    workflows: ["Build Debian Packages"]
+    types:
+      - completed
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+jobs:
+  build-repository:
+    name: Build APT Repository
+    runs-on: ubuntu-latest
+    if: ${{ github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success' }}
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      
+      - name: Setup GPG for package signing
+        id: gpg
+        run: |
+          # Generate GPG key for package signing
+          sudo apt-get update
+          sudo apt-get install -y gnupg reprepro
+          
+          # Create GPG key configuration
+          cat > gpg-batch << EOF
+          %echo Generating GPG key for APT repository
+          Key-Type: RSA
+          Key-Length: 4096
+          Subkey-Type: RSA
+          Subkey-Length: 4096
+          Name-Real: APRS Daemon Repository
+          Name-Email: aprstx-repo@github.io
+          Expire-Date: 3y
+          %no-protection
+          %commit
+          %echo done
+          EOF
+          
+          # Generate key
+          export GNUPGHOME=$(mktemp -d)
+          gpg --batch --generate-key gpg-batch
+          
+          # Export public key
+          gpg --armor --export aprstx-repo@github.io > repository-key.asc
+          echo "GPG_HOME=$GNUPGHOME" >> $GITHUB_OUTPUT
+          
+      - name: Download all release assets
+        if: startsWith(github.ref, 'refs/tags/')
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Get the release
+          RELEASE_TAG=${GITHUB_REF#refs/tags/}
+          
+          # Create directory for packages
+          mkdir -p packages
+          
+          # Download all .deb files from the release
+          gh release download "$RELEASE_TAG" --pattern "*.deb" --dir packages || true
+          
+          # List downloaded packages
+          ls -la packages/
+      
+      - name: Download workflow artifacts
+        if: github.event_name == 'workflow_dispatch'
+        uses: actions/download-artifact@v4
+        with:
+          path: packages
+          pattern: aprstx-*
+      
+      - name: Create APT repository structure
+        env:
+          GNUPGHOME: ${{ steps.gpg.outputs.GPG_HOME }}
+        run: |
+          # Create repository directories
+          mkdir -p apt/{conf,db,dists,pool}
+          
+          # Create distributions configuration
+          cat > apt/conf/distributions << 'EOF'
+          Origin: APRS Daemon
+          Label: APRS Daemon Repository
+          Suite: stable
+          Codename: bullseye
+          Architectures: amd64 arm64 armhf
+          Components: main
+          Description: APT repository for APRS Daemon (aprstx)
+          SignWith: aprstx-repo@github.io
+          
+          Origin: APRS Daemon
+          Label: APRS Daemon Repository
+          Suite: stable
+          Codename: bookworm
+          Architectures: amd64 arm64 armhf
+          Components: main
+          Description: APT repository for APRS Daemon (aprstx)
+          SignWith: aprstx-repo@github.io
+          
+          Origin: APRS Daemon
+          Label: APRS Daemon Repository
+          Suite: stable
+          Codename: trixie
+          Architectures: amd64 arm64 armhf
+          Components: main
+          Description: APT repository for APRS Daemon (aprstx)
+          SignWith: aprstx-repo@github.io
+          EOF
+          
+          # Create options file
+          cat > apt/conf/options << 'EOF'
+          verbose
+          basedir .
+          ask-passphrase
+          EOF
+          
+          # Copy public key to repository root
+          cp repository-key.asc apt/repository-key.asc
+          
+      - name: Add packages to repository
+        env:
+          GNUPGHOME: ${{ steps.gpg.outputs.GPG_HOME }}
+        run: |
+          cd apt
+          
+          # Find and add all .deb files
+          find ../packages -name "*.deb" -type f | while read deb; do
+            echo "Processing $deb..."
+            
+            # Extract codename from filename (assumes format: aprstx_version_codename_arch.deb)
+            codename=$(basename "$deb" | cut -d'_' -f3)
+            
+            # Add to appropriate distribution
+            case "$codename" in
+              bullseye|bookworm|trixie)
+                reprepro includedeb "$codename" "$deb" || echo "Failed to add $deb to $codename"
+                ;;
+              *)
+                echo "Unknown codename: $codename, trying all distributions"
+                for dist in bullseye bookworm trixie; do
+                  reprepro includedeb "$dist" "$deb" || true
+                done
+                ;;
+            esac
+          done
+          
+          # Generate repository metadata
+          reprepro export
+      
+      - name: Create index.html for GitHub Pages
+        run: |
+          cat > apt/index.html << 'EOF'
+          <!DOCTYPE html>
+          <html>
+          <head>
+              <title>APRS Daemon (aprstx) APT Repository</title>
+              <style>
+                  body {
+                      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+                      line-height: 1.6;
+                      color: #333;
+                      max-width: 800px;
+                      margin: 0 auto;
+                      padding: 20px;
+                  }
+                  code {
+                      background: #f4f4f4;
+                      padding: 2px 5px;
+                      border-radius: 3px;
+                  }
+                  pre {
+                      background: #f4f4f4;
+                      padding: 10px;
+                      border-radius: 5px;
+                      overflow-x: auto;
+                  }
+                  .install-box {
+                      background: #e7f3ff;
+                      border: 1px solid #2188ff;
+                      border-radius: 5px;
+                      padding: 15px;
+                      margin: 20px 0;
+                  }
+              </style>
+          </head>
+          <body>
+              <h1>APRS Daemon (aprstx) APT Repository</h1>
+              
+              <p>This is the official APT repository for <strong>aprstx</strong>, a high-performance APRS daemon written in Rust.</p>
+              
+              <h2>Quick Installation</h2>
+              
+              <div class="install-box">
+                  <p>Run this command to add the repository and install aprstx:</p>
+                  <pre>curl -fsSL https://${GITHUB_REPOSITORY_OWNER}.github.io/${GITHUB_REPOSITORY#*/}/install.sh | sudo bash</pre>
+              </div>
+              
+              <h2>Manual Installation</h2>
+              
+              <h3>1. Add the repository key</h3>
+              <pre>curl -fsSL https://${GITHUB_REPOSITORY_OWNER}.github.io/${GITHUB_REPOSITORY#*/}/repository-key.asc | sudo apt-key add -</pre>
+              
+              <h3>2. Add the repository to your sources</h3>
+              <pre>echo "deb https://${GITHUB_REPOSITORY_OWNER}.github.io/${GITHUB_REPOSITORY#*/} $(lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/aprstx.list</pre>
+              
+              <h3>3. Update and install</h3>
+              <pre>sudo apt update
+          sudo apt install aprstx</pre>
+              
+              <h2>Supported Distributions</h2>
+              <ul>
+                  <li>Debian 11 (Bullseye)</li>
+                  <li>Debian 12 (Bookworm)</li>
+                  <li>Debian 13 (Trixie)</li>
+              </ul>
+              
+              <h2>Supported Architectures</h2>
+              <ul>
+                  <li>amd64 (x86_64)</li>
+                  <li>arm64 (aarch64)</li>
+                  <li>armhf (armv7)</li>
+              </ul>
+              
+              <h2>Repository Contents</h2>
+              <ul>
+                  <li><a href="repository-key.asc">GPG Public Key</a></li>
+                  <li><a href="dists/">Package Distributions</a></li>
+                  <li><a href="pool/">Package Pool</a></li>
+              </ul>
+              
+              <h2>More Information</h2>
+              <p>For more information about aprstx, visit the <a href="https://github.com/${GITHUB_REPOSITORY}">GitHub repository</a>.</p>
+          </body>
+          </html>
+          EOF
+          
+          # Replace variables
+          sed -i "s|\${GITHUB_REPOSITORY_OWNER}|${GITHUB_REPOSITORY_OWNER}|g" apt/index.html
+          sed -i "s|\${GITHUB_REPOSITORY}|${GITHUB_REPOSITORY}|g" apt/index.html
+      
+      - name: Create installation script
+        run: |
+          cat > apt/install.sh << 'EOF'
+          #!/bin/bash
+          set -e
+          
+          echo "APRS Daemon (aprstx) Repository Installer"
+          echo "========================================="
+          echo
+          
+          # Check if running as root
+          if [ "$EUID" -ne 0 ]; then 
+              echo "Please run with sudo: sudo bash install.sh"
+              exit 1
+          fi
+          
+          # Detect distribution
+          if [ -f /etc/os-release ]; then
+              . /etc/os-release
+              DISTRO=$VERSION_CODENAME
+          else
+              echo "Cannot detect distribution"
+              exit 1
+          fi
+          
+          # Check if supported
+          case "$DISTRO" in
+              bullseye|bookworm|trixie)
+                  echo "Detected: $PRETTY_NAME"
+                  ;;
+              *)
+                  echo "Unsupported distribution: $DISTRO"
+                  echo "Supported: Debian 11 (bullseye), 12 (bookworm), 13 (trixie)"
+                  exit 1
+                  ;;
+          esac
+          
+          # Add repository key
+          echo "Adding repository key..."
+          curl -fsSL https://${GITHUB_REPOSITORY_OWNER}.github.io/${GITHUB_REPOSITORY#*/}/repository-key.asc | apt-key add -
+          
+          # Add repository
+          echo "Adding repository..."
+          echo "deb https://${GITHUB_REPOSITORY_OWNER}.github.io/${GITHUB_REPOSITORY#*/} $DISTRO main" > /etc/apt/sources.list.d/aprstx.list
+          
+          # Update package list
+          echo "Updating package list..."
+          apt update
+          
+          # Install aprstx
+          echo "Installing aprstx..."
+          apt install -y aprstx
+          
+          echo
+          echo "Installation complete!"
+          echo
+          echo "Next steps:"
+          echo "1. Edit configuration: sudo nano /etc/aprstx/aprstx.conf"
+          echo "2. Start the service: sudo systemctl start aprstx"
+          echo "3. Enable at boot: sudo systemctl enable aprstx"
+          echo "4. Check status: sudo systemctl status aprstx"
+          echo
+          EOF
+          
+          # Replace variables
+          sed -i "s|\${GITHUB_REPOSITORY_OWNER}|${GITHUB_REPOSITORY_OWNER}|g" apt/install.sh
+          sed -i "s|\${GITHUB_REPOSITORY}|${GITHUB_REPOSITORY}|g" apt/install.sh
+          chmod +x apt/install.sh
+      
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: apt
+  
+  deploy-pages:
+    name: Deploy to GitHub Pages
+    needs: build-repository
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
