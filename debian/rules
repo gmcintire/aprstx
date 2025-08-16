@@ -51,6 +51,10 @@ ifndef CARGO_BUILD_TARGET
 	cargo test --release
 endif
 
+override_dh_auto_clean:
+	# Skip auto clean - we'll handle it in override_dh_clean
+	@echo "Skipping auto clean"
+
 override_dh_clean:
 	dh_clean
 	rm -rf $(CARGO_HOME)
