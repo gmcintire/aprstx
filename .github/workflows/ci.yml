@@ -15,11 +15,22 @@ jobs:
     name: Test
     runs-on: ${{ matrix.os }}
     strategy:
+      fail-fast: false
       matrix:
         os: [ubuntu-latest, macos-latest]
         rust: [stable, beta, nightly]
+        include:
+          - rust: nightly
+            experimental: true
+    continue-on-error: ${{ matrix.experimental == true }}
     steps:
       - uses: actions/checkout@v4
+      
+      - name: Install system dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libudev-dev
       
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@master
@@ -52,6 +63,7 @@ jobs:
       - name: Run clippy
         run: cargo clippy --all-targets --all-features -- -D warnings
         if: matrix.rust == 'stable'
+        continue-on-error: ${{ matrix.rust == 'nightly' }}
       
       - name: Build
         run: cargo build --all-features --verbose
