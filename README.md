@@ -45,6 +45,13 @@ sudo apt install aprstx
 Automated development builds from the main branch are available:
 
 ```bash
+# Quick install - adds dev repository and installs aprstx
+curl -fsSL https://gmcintire.github.io/aprstx/dev/install-dev.sh | sudo bash
+```
+
+Or manually add the dev repository:
+
+```bash
 # Add dev repository key
 curl -fsSL https://gmcintire.github.io/aprstx/dev/dev-repository-key.asc | sudo apt-key add -
 
