@@ -41,18 +41,38 @@ jobs:
           cd ..
       
       - name: Download stable repository artifact
-        uses: actions/download-artifact@v5
         continue-on-error: true
-        with:
-          name: apt-repository
-          path: stable-artifacts
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # Try to download the latest apt-repository artifact
+          echo "Looking for apt-repository artifact..."
+          ARTIFACT_ID=$(gh api repos/${{ github.repository }}/actions/artifacts --jq '.artifacts[] | select(.name == "apt-repository") | .id' | head -1)
+          if [ -n "$ARTIFACT_ID" ]; then
+            echo "Found artifact ID: $ARTIFACT_ID"
+            mkdir -p stable-artifacts
+            gh api repos/${{ github.repository }}/actions/artifacts/$ARTIFACT_ID/zip --output stable-artifacts/artifact.zip
+            cd stable-artifacts && unzip -q artifact.zip && rm artifact.zip && cd ..
+          else
+            echo "No apt-repository artifact found"
+          fi
       
       - name: Download dev repository artifact
-        uses: actions/download-artifact@v5
         continue-on-error: true
-        with:
-          name: dev-repository
-          path: dev-artifacts
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # Try to download the latest dev-repository artifact
+          echo "Looking for dev-repository artifact..."
+          ARTIFACT_ID=$(gh api repos/${{ github.repository }}/actions/artifacts --jq '.artifacts[] | select(.name == "dev-repository") | .id' | head -1)
+          if [ -n "$ARTIFACT_ID" ]; then
+            echo "Found artifact ID: $ARTIFACT_ID"
+            mkdir -p dev-artifacts
+            gh api repos/${{ github.repository }}/actions/artifacts/$ARTIFACT_ID/zip --output dev-artifacts/artifact.zip
+            cd dev-artifacts && unzip -q artifact.zip && rm artifact.zip && cd ..
+          else
+            echo "No dev-repository artifact found"
+          fi
       
       - name: Merge repositories
         run: |
