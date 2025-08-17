@@ -115,6 +115,20 @@ cargo build --release
 
 The binary will be created at `target/release/aprstx`
 
+To run from source:
+```bash
+# Create a config file from the example
+cp aprstx.conf.example aprstx.conf
+# Edit the config with your callsign and settings
+nano aprstx.conf
+
+# Run with the config file
+./target/release/aprstx --config aprstx.conf --foreground
+
+# Or run with cargo
+cargo run -- --config aprstx.conf --foreground
+```
+
 ## Configuration
 
 For Debian package installations, edit `/etc/aprstx/aprstx.conf`:

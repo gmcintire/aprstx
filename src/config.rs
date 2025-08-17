@@ -129,7 +129,21 @@ impl Default for SmartBeaconConfig {
 
 impl Config {
     pub fn load<P: AsRef<Path>>(path: P) -> Result<Self> {
-        let contents = std::fs::read_to_string(path)?;
+        let path = path.as_ref();
+        let contents = std::fs::read_to_string(path)
+            .map_err(|e| {
+                if e.kind() == std::io::ErrorKind::NotFound {
+                    anyhow::anyhow!(
+                        "Configuration file not found: {}\n\
+                         Hint: Copy aprstx.conf.example to {} and edit it with your settings.\n\
+                         Or use --config to specify a different path.",
+                        path.display(),
+                        path.display()
+                    )
+                } else {
+                    anyhow::anyhow!("Failed to read config file {}: {}", path.display(), e)
+                }
+            })?;
         let config: Config = toml::from_str(&contents)?;
         Ok(config)
     }
