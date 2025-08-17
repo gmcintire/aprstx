@@ -273,7 +273,11 @@ jobs:
                   <a href="/aprstx/">main repository</a>.
               </div>
               
-              <h2>Add Development Repository</h2>
+              <h2>Quick Installation</h2>
+              
+              <pre>curl -fsSL https://gmcintire.github.io/aprstx/dev/install-dev.sh | sudo bash</pre>
+              
+              <h2>Manual Installation</h2>
               
               <pre>
           # Add repository key
@@ -403,6 +407,90 @@ jobs:
               done
             fi
           done
+      
+      - name: Create dev install script
+        run: |
+          cat > apt-dev/install-dev.sh << 'EOF'
+          #!/bin/bash
+          set -e
+          
+          echo "APRS Daemon Dev Repository Installer"
+          echo "===================================="
+          echo
+          echo "⚠️  WARNING: This will install DEVELOPMENT builds"
+          echo "These may be unstable. For stable releases, use:"
+          echo "curl -fsSL https://gmcintire.github.io/aprstx/install.sh | sudo bash"
+          echo
+          read -p "Continue with dev installation? (y/N) " -n 1 -r
+          echo
+          if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+              exit 1
+          fi
+          
+          # Check if running as root
+          if [ "$EUID" -ne 0 ]; then 
+              echo "Please run with sudo: sudo bash install-dev.sh"
+              exit 1
+          fi
+          
+          # Detect distribution
+          if [ -f /etc/os-release ]; then
+              . /etc/os-release
+              DISTRO=$VERSION_CODENAME
+          else
+              echo "Cannot detect distribution"
+              exit 1
+          fi
+          
+          # Check if supported
+          case "$DISTRO" in
+              bullseye|bookworm|trixie)
+                  echo "Detected: $PRETTY_NAME"
+                  ;;
+              *)
+                  echo "Unsupported distribution: $DISTRO"
+                  echo "Supported: Debian 11 (bullseye), 12 (bookworm), 13 (trixie)"
+                  exit 1
+                  ;;
+          esac
+          
+          # Remove stable repository if it exists
+          if [ -f /etc/apt/sources.list.d/aprstx.list ]; then
+              echo "Removing stable repository..."
+              rm -f /etc/apt/sources.list.d/aprstx.list
+          fi
+          
+          # Add dev repository key
+          echo "Adding dev repository key..."
+          curl -fsSL https://gmcintire.github.io/aprstx/dev/dev-repository-key.asc | apt-key add -
+          
+          # Add dev repository
+          echo "Adding dev repository..."
+          echo "deb https://gmcintire.github.io/aprstx/dev dev main" > /etc/apt/sources.list.d/aprstx-dev.list
+          
+          # Update package list
+          echo "Updating package list..."
+          apt update
+          
+          # Install aprstx
+          echo "Installing aprstx (dev version)..."
+          apt install -y aprstx
+          
+          echo
+          echo "Dev installation complete!"
+          echo
+          echo "Next steps:"
+          echo "1. Edit configuration: sudo nano /etc/aprstx/aprstx.conf"
+          echo "2. Start the service: sudo systemctl start aprstx"
+          echo "3. Enable at boot: sudo systemctl enable aprstx"
+          echo "4. Check status: sudo systemctl status aprstx"
+          echo
+          echo "To switch back to stable releases:"
+          echo "1. Remove dev repository: sudo rm /etc/apt/sources.list.d/aprstx-dev.list"
+          echo "2. Run stable installer: curl -fsSL https://gmcintire.github.io/aprstx/install.sh | sudo bash"
+          EOF
+          
+          chmod +x apt-dev/install-dev.sh
       
       - name: Create archive of dev repository
         run: |
