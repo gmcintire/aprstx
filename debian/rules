@@ -42,6 +42,7 @@ else
 endif
 	install -Dm644 aprstx.conf.example debian/aprstx/etc/aprstx/aprstx.conf.example
 	install -Dm644 debian/aprstx.service debian/aprstx/lib/systemd/system/aprstx.service
+	install -Dm644 debian/aprstx-bluetooth@.service debian/aprstx/lib/systemd/system/aprstx-bluetooth@.service
 	install -Dm644 debian/aprstx.udev debian/aprstx/lib/udev/rules.d/99-aprstx.rules
 	install -Dm644 README.md debian/aprstx/usr/share/doc/aprstx/README.md
 

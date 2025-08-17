@@ -167,6 +167,70 @@ viscous_delay = 5
 max_hops = 3
 ```
 
+### Bluetooth Configuration (Kenwood TH-D74/D75)
+
+aprstx supports Bluetooth connections to radios with built-in TNCs like the Kenwood TH-D74/D75:
+
+1. **Enable KISS mode on your radio**:
+   - TH-D74: Menu > Configuration > APRS > Data Speed > 9600
+   - TH-D74: Menu > Configuration > APRS > PC Output (KISS) > On
+
+2. **Pair your radio via Bluetooth**:
+   ```bash
+   # Scan for devices
+   sudo bluetoothctl
+   scan on
+   # Look for your radio (e.g., "TH-D74")
+   # Pair with the device
+   pair XX:XX:XX:XX:XX:XX
+   trust XX:XX:XX:XX:XX:XX
+   exit
+   ```
+
+3. **Create RFCOMM connection**:
+   ```bash
+   # Bind to rfcomm0 (use the Bluetooth address from above)
+   sudo rfcomm bind 0 XX:XX:XX:XX:XX:XX
+   
+   # Or add to /etc/bluetooth/rfcomm.conf for persistent connection:
+   # rfcomm0 {
+   #     bind yes;
+   #     device XX:XX:XX:XX:XX:XX;
+   #     channel 1;
+   #     comment "Kenwood TH-D74";
+   # }
+   ```
+
+4. **Configure aprstx**:
+   ```toml
+   [[serial_ports]]
+   name = "bluetooth"
+   device = "/dev/rfcomm0"
+   baud_rate = 9600
+   protocol = "kiss"
+   tx_enable = true
+   rx_enable = true
+   ```
+
+5. **Add user to dialout group** (if not using systemd service):
+   ```bash
+   sudo usermod -a -G dialout $USER
+   # Log out and back in for group change to take effect
+   ```
+
+### Automatic Bluetooth Connection (Debian Package)
+
+If you installed via the Debian package, you can use the included systemd service to automatically connect your Bluetooth device:
+
+```bash
+# Enable automatic connection (replace XX:XX:XX:XX:XX:XX with your radio's address)
+sudo systemctl enable aprstx-bluetooth@XX:XX:XX:XX:XX:XX.service
+sudo systemctl start aprstx-bluetooth@XX:XX:XX:XX:XX:XX.service
+
+# The service will automatically connect before aprstx starts
+sudo systemctl restart aprstx
+```
+
 ## Running
 
 ### Debian Package Installation

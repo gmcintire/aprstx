@@ -1,0 +1,17 @@
+# Systemd service to automatically connect Bluetooth RFCOMM devices
+# Usage: systemctl enable aprstx-bluetooth@XX:XX:XX:XX:XX:XX.service
+# Where XX:XX:XX:XX:XX:XX is your radio's Bluetooth address
+
+[Unit]
+Description=APRS Bluetooth RFCOMM connection for %i
+Before=aprstx.service
+After=bluetooth.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/bin/rfcomm bind rfcomm0 %i
+ExecStop=/usr/bin/rfcomm release rfcomm0
+
+[Install]
+WantedBy=multi-user.target

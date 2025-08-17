@@ -11,10 +11,20 @@ device = "/dev/ttyUSB0"  # Common USB-serial adapter
 # device = "/dev/ttyS0"   # Raspberry Pi GPIO UART (Pi 5)
 # device = "/dev/tnc-usb" # Udev symlink for USB TNCs
 # device = "/dev/tnc-gpio" # Udev symlink for GPIO UART
+# device = "/dev/rfcomm0" # Bluetooth RFCOMM (e.g., Kenwood TH-D74)
 baud_rate = 9600
 protocol = "kiss"
 tx_enable = true
 rx_enable = true
+
+# Example: Bluetooth connection to Kenwood TH-D74
+# [[serial_ports]]
+# name = "bluetooth"
+# device = "/dev/rfcomm0"
+# baud_rate = 9600  # TH-D74 uses 9600 baud for KISS
+# protocol = "kiss"
+# tx_enable = true
+# rx_enable = true
 
 # Uncomment to add a second port
 # [[serial_ports]]
