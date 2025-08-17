@@ -161,7 +161,7 @@ jobs:
           echo "DEB_PACKAGE=$NEW_NAME" >> $GITHUB_ENV
       
       - name: Upload artifact
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v4
         with:
           name: aprstx-${{ matrix.debian_version.codename }}-${{ matrix.arch.deb }}
           path: ${{ env.DEB_PACKAGE }}
