@@ -77,11 +77,11 @@ jobs:
       - name: Merge repositories
         run: |
           # Create the final pages structure
-          mkdir -p pages-deploy/aprstx
+          mkdir -p pages-deploy
           
           # Copy existing pages content if available
-          if [ -d current-pages/aprstx ]; then
-            cp -r current-pages/aprstx/* pages-deploy/aprstx/ || true
+          if [ -d current-pages ]; then
+            cp -r current-pages/* pages-deploy/ || true
           fi
           
           # Extract and merge stable repository if available
@@ -89,7 +89,7 @@ jobs:
             echo "Extracting stable repository..."
             mkdir -p temp-stable
             tar xzf stable-artifacts/apt-repository.tar.gz -C temp-stable
-            cp -r temp-stable/* pages-deploy/aprstx/
+            cp -r temp-stable/* pages-deploy/
             rm -rf temp-stable
           fi
           
@@ -98,19 +98,17 @@ jobs:
             echo "Extracting dev repository..."
             mkdir -p temp-dev
             tar xzf dev-artifacts/dev-repository.tar.gz -C temp-dev
-            mkdir -p pages-deploy/aprstx/dev
-            cp -r temp-dev/* pages-deploy/aprstx/dev/
+            mkdir -p pages-deploy/dev
+            cp -r temp-dev/* pages-deploy/dev/
             rm -rf temp-dev
           fi
           
-          # Create root index if it doesn't exist
-          if [ ! -f pages-deploy/index.html ]; then
-            cat > pages-deploy/index.html << 'EOF'
+          # Create or update the main index.html
+          cat > pages-deploy/index.html << 'EOF'
           <!DOCTYPE html>
           <html>
           <head>
-              <title>gmcintire.github.io</title>
-              <meta charset="utf-8">
+              <title>APRS Daemon (aprstx) APT Repository</title>
               <style>
                   body {
                       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
@@ -120,39 +118,67 @@ jobs:
                       margin: 0 auto;
                       padding: 20px;
                   }
-                  .project {
-                      background: #f6f8fa;
-                      border: 1px solid #d1d5da;
-                      border-radius: 6px;
-                      padding: 16px;
-                      margin-bottom: 16px;
+                  code {
+                      background: #f4f4f4;
+                      padding: 2px 5px;
+                      border-radius: 3px;
                   }
-                  h2 {
-                      margin-top: 0;
+                  pre {
+                      background: #f4f4f4;
+                      padding: 10px;
+                      border-radius: 5px;
+                      overflow-x: auto;
+                  }
+                  .install-box {
+                      background: #e7f3ff;
+                      border: 1px solid #2188ff;
+                      border-radius: 5px;
+                      padding: 15px;
+                      margin: 20px 0;
+                  }
+                  .dev-box {
+                      background: #fff3cd;
+                      border: 1px solid #ffeeba;
+                      border-radius: 5px;
+                      padding: 15px;
+                      margin: 20px 0;
                   }
               </style>
           </head>
           <body>
-              <h1>Graham McIntire's Projects</h1>
+              <h1>APRS Daemon (aprstx) APT Repository</h1>
               
-              <div class="project">
-                  <h2>APRS Daemon (aprstx)</h2>
-                  <p>A high-performance APRS daemon written in Rust, providing I-gate and digipeater functionality.</p>
-                  <ul>
-                      <li><a href="/aprstx/">Stable APT Repository</a> - Production releases</li>
-                      <li><a href="/aprstx/dev/">Development APT Repository</a> - Latest builds from main branch</li>
-                      <li><a href="https://github.com/gmcintire/aprstx">GitHub Repository</a></li>
-                  </ul>
+              <p>This is the official APT repository for <strong>aprstx</strong>, a high-performance APRS daemon written in Rust.</p>
+              
+              <h2>Quick Installation (Stable)</h2>
+              
+              <div class="install-box">
+                  <p>Run this command to add the repository and install aprstx:</p>
+                  <pre>curl -fsSL https://gmcintire.github.io/aprstx/install.sh | sudo bash</pre>
               </div>
+              
+              <h2>Development Builds</h2>
+              
+              <div class="dev-box">
+                  <p><strong>⚠️ Warning:</strong> Development builds may be unstable!</p>
+                  <p>To install the latest development build:</p>
+                  <pre>curl -fsSL https://gmcintire.github.io/aprstx/dev/install-dev.sh | sudo bash</pre>
+                  <p><a href="/aprstx/dev/">Browse dev repository →</a></p>
+              </div>
+              
+              <h2>Repository Contents</h2>
+              <ul>
+                  <li><a href="repository-key.asc">GPG Public Key</a></li>
+                  <li><a href="dists/">Package Distributions</a></li>
+                  <li><a href="pool/">Package Pool</a></li>
+                  <li><a href="install.sh">Installation Script</a></li>
+              </ul>
+              
+              <h2>More Information</h2>
+              <p>For more information about aprstx, visit the <a href="https://github.com/gmcintire/aprstx">GitHub repository</a>.</p>
           </body>
           </html>
           EOF
-          fi
-          
-          # Create aprstx index if missing
-          if [ ! -f pages-deploy/aprstx/index.html ]; then
-            echo "Warning: No stable repository index.html found"
-          fi
       
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3

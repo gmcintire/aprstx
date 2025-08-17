@@ -342,7 +342,7 @@ jobs:
           <!DOCTYPE html>
           <html>
           <head>
-              <title>Index of /aprstx/'"$title"'</title>
+              <title>Index of /'"$title"'</title>
               <style>
                   body {
                       font-family: monospace;
@@ -379,7 +379,7 @@ jobs:
               </style>
           </head>
           <body>
-              <h1>Index of /aprstx/'"$title"'</h1>
+              <h1>Index of /'"$title"'</h1>
               <table>
                   <tr>
                       <th>Name</th>

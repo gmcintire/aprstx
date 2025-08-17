@@ -270,7 +270,7 @@ jobs:
                   <strong>⚠️ Warning:</strong> This repository contains development builds that are automatically 
                   generated from the main branch. These packages may be unstable and are not recommended for 
                   production use. For stable releases, use the 
-                  <a href="/aprstx/">main repository</a>.
+                  <a href="/">main repository</a>.
               </div>
               
               <h2>Quick Installation</h2>
@@ -311,7 +311,7 @@ jobs:
                   <li><a href="pool/main/">Browse all .deb packages</a></li>
               </ul>
               
-              <p><a href="/aprstx/">← Back to stable repository</a></p>
+              <p><a href="/">← Back to stable repository</a></p>
           </body>
           </html>
           ENDHTML
@@ -327,7 +327,7 @@ jobs:
           <!DOCTYPE html>
           <html>
           <head>
-              <title>Index of /aprstx/dev/'"$title"'</title>
+              <title>Index of /dev/'"$title"'</title>
               <style>
                   body {
                       font-family: monospace;
@@ -364,7 +364,7 @@ jobs:
               </style>
           </head>
           <body>
-              <h1>Index of /aprstx/dev/'"$title"'</h1>
+              <h1>Index of /dev/'"$title"'</h1>
               <table>
                   <tr>
                       <th>Name</th>
