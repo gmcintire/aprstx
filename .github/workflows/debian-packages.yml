@@ -161,78 +161,14 @@ jobs:
           echo "DEB_PACKAGE=$NEW_NAME" >> $GITHUB_ENV
       
       - name: Upload artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: aprstx-${{ matrix.debian_version.codename }}-${{ matrix.arch.deb }}
           path: ${{ env.DEB_PACKAGE }}
   
-  create-apt-repository:
-    name: Create APT Repository
-    needs: build-deb
-    runs-on: ubuntu-latest
-    
-    steps:
-      - name: Download all artifacts
-        uses: actions/download-artifact@v5
-        with:
-          path: packages
-      
-      - name: Install repository tools
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y reprepro gnupg
-      
-      - name: Create repository structure
-        run: |
-          mkdir -p apt-repo/{conf,dists,pool}
-          
-          # Create distributions file
-          cat > apt-repo/conf/distributions << EOF
-          Origin: aprstx
-          Label: APRS Daemon Repository
-          Codename: bullseye
-          Architectures: amd64 arm64 armhf source
-          Components: main
-          Description: APT repository for aprstx
-          
-          Origin: aprstx
-          Label: APRS Daemon Repository
-          Codename: bookworm
-          Architectures: amd64 arm64 armhf source
-          Components: main
-          Description: APT repository for aprstx
-          
-          Origin: aprstx
-          Label: APRS Daemon Repository
-          Codename: trixie
-          Architectures: amd64 arm64 armhf source
-          Components: main
-          Description: APT repository for aprstx
-          EOF
-      
-      - name: Add packages to repository
-        run: |
-          cd apt-repo
-          for deb in ../packages/*/*.deb; do
-            echo "Adding $deb to repository..."
-            reprepro includedeb bullseye "$deb" || \
-            reprepro includedeb bookworm "$deb" || \
-            reprepro includedeb trixie "$deb" || true
-          done
-      
-      - name: Create repository archive
-        run: |
-          tar czf apt-repository.tar.gz -C apt-repo .
-      
-      - name: Upload repository archive
-        uses: actions/upload-artifact@v4
-        with:
-          name: apt-repository
-          path: apt-repository.tar.gz
-  
   release:
     name: Create Release
-    needs: [build-deb, create-apt-repository]
+    needs: build-deb
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/v')
     
@@ -382,7 +318,6 @@ jobs:
           body_path: RELEASE_NOTES.md
           files: |
             release/*/*.deb
-            release/apt-repository/apt-repository.tar.gz
             install-aprstx.sh
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
