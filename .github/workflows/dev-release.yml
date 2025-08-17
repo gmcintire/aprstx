@@ -41,6 +41,12 @@ jobs:
       - name: Install cross-compilation tools
         if: matrix.arch.rust != 'x86_64-unknown-linux-gnu'
         run: |
+          # Wait for apt locks to be released
+          while sudo fuser /var/lib/dpkg/lock-frontend >/dev/null 2>&1; do
+            echo "Waiting for other apt processes to finish..."
+            sleep 5
+          done
+          
           sudo apt-get update
           sudo apt-get install -y \
             gcc-aarch64-linux-gnu \
@@ -50,6 +56,12 @@ jobs:
       
       - name: Install packaging dependencies
         run: |
+          # Wait for apt locks to be released
+          while sudo fuser /var/lib/dpkg/lock-frontend >/dev/null 2>&1; do
+            echo "Waiting for other apt processes to finish..."
+            sleep 5
+          done
+          
           sudo apt-get update
           sudo apt-get install -y \
             debhelper \
@@ -148,6 +160,12 @@ jobs:
       - name: Setup GPG for package signing
         id: gpg
         run: |
+          # Wait for apt locks to be released
+          while sudo fuser /var/lib/dpkg/lock-frontend >/dev/null 2>&1; do
+            echo "Waiting for other apt processes to finish..."
+            sleep 5
+          done
+          
           sudo apt-get update
           sudo apt-get install -y gnupg reprepro
           

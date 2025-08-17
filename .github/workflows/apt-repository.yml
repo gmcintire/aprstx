@@ -23,6 +23,12 @@ jobs:
       - name: Setup GPG for package signing
         id: gpg
         run: |
+          # Wait for apt locks to be released
+          while sudo fuser /var/lib/dpkg/lock-frontend >/dev/null 2>&1; do
+            echo "Waiting for other apt processes to finish..."
+            sleep 5
+          done
+          
           # Generate GPG key for package signing
           sudo apt-get update
           sudo apt-get install -y gnupg reprepro
