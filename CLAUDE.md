@@ -35,16 +35,42 @@ make dev
 # Generate test coverage report
 make coverage
 
-# Run linter
+# Run linter (MUST pass before committing)
 cargo clippy -- -D warnings
 
-# Format code
+# Format code (MUST run before committing)
 cargo fmt
 ```
 
+### IMPORTANT: Pre-commit Checklist
+
+**ALWAYS run these commands before saying any task is complete or committing code:**
+
+```bash
+# 1. Format all code
+cargo fmt
+
+# 2. Run clippy and ensure no warnings
+cargo clippy -- -D warnings
+
+# 3. Run all tests
+cargo test
+
+# 4. Build to ensure it compiles
+cargo build --release
+
+# 5. Only commit if ALL above commands pass successfully
+```
+
+If any of these fail, fix the issues before proceeding. Never commit code that:
+- Has formatting issues (cargo fmt modifies files)
+- Has clippy warnings
+- Fails tests
+- Doesn't compile
+
 ### Makefile Targets
 
-- `make all` - Complete build pipeline (format → lint → test → build)
+- `make all` - Complete build pipeline (format → lint → test → build) - **USE THIS BEFORE COMMITS**
 - `make test` - Run all tests with verbose output
 - `make lint` - Run clippy with warnings as errors
 - `make dev` - Watch mode for development (requires cargo-watch)

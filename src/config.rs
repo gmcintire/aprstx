@@ -130,32 +130,30 @@ impl Default for SmartBeaconConfig {
 impl Config {
     pub fn load<P: AsRef<Path>>(path: P) -> Result<Self> {
         let path = path.as_ref();
-        let contents = std::fs::read_to_string(path)
-            .map_err(|e| {
-                if e.kind() == std::io::ErrorKind::NotFound {
-                    anyhow::anyhow!(
-                        "Configuration file not found: {}\n\
+        let contents = std::fs::read_to_string(path).map_err(|e| {
+            if e.kind() == std::io::ErrorKind::NotFound {
+                anyhow::anyhow!(
+                    "Configuration file not found: {}\n\
                          Hint: Copy aprstx.conf.example to {} and edit it with your settings.\n\
                          Or use --config to specify a different path.",
-                        path.display(),
-                        path.display()
-                    )
-                } else {
-                    anyhow::anyhow!("Failed to read config file {}: {}", path.display(), e)
-                }
-            })?;
-        let config: Config = toml::from_str(&contents)
-            .map_err(|e| {
-                anyhow::anyhow!(
-                    "Failed to parse configuration file {}: {}\n\
+                    path.display(),
+                    path.display()
+                )
+            } else {
+                anyhow::anyhow!("Failed to read config file {}: {}", path.display(), e)
+            }
+        })?;
+        let config: Config = toml::from_str(&contents).map_err(|e| {
+            anyhow::anyhow!(
+                "Failed to parse configuration file {}: {}\n\
                      Hint: Check the TOML syntax. Common issues:\n\
                      - Missing quotes around strings\n\
                      - Incorrect array syntax (use [[section]] for arrays)\n\
                      - Invalid data types for fields",
-                    path.display(),
-                    e
-                )
-            })?;
+                path.display(),
+                e
+            )
+        })?;
         Ok(config)
     }
 }
