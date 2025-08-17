@@ -48,7 +48,13 @@ async fn main() -> Result<()> {
 
     info!("Starting aprstx daemon...");
 
-    let config = Arc::new(Config::load(&args.config)?);
+    let config = match Config::load(&args.config) {
+        Ok(config) => Arc::new(config),
+        Err(e) => {
+            eprintln!("Error: {}", e);
+            std::process::exit(1);
+        }
+    };
     info!("Loaded configuration from {:?}", args.config);
 
     // Create packet filter

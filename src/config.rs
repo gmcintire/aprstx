@@ -144,7 +144,18 @@ impl Config {
                     anyhow::anyhow!("Failed to read config file {}: {}", path.display(), e)
                 }
             })?;
-        let config: Config = toml::from_str(&contents)?;
+        let config: Config = toml::from_str(&contents)
+            .map_err(|e| {
+                anyhow::anyhow!(
+                    "Failed to parse configuration file {}: {}\n\
+                     Hint: Check the TOML syntax. Common issues:\n\
+                     - Missing quotes around strings\n\
+                     - Incorrect array syntax (use [[section]] for arrays)\n\
+                     - Invalid data types for fields",
+                    path.display(),
+                    e
+                )
+            })?;
         Ok(config)
     }
 }
